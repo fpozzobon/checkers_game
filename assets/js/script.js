@@ -18,15 +18,20 @@ const translations = {
     sound: "Sound On/Off",
     forcedHighlight: "Forced capture highlight",
     language: "Language",
+    ruleset: "Rule set",
+    flyingKings: "Flying kings",
+    britishDraughts: "British draughts",
     simpleMove: "Simple move:",
     simpleMoveText:
       "Move a piece one square diagonally forward to an adjacent unoccupied dark square.",
     jump: "Jump (capture an opponent's piece):",
     jumpText:
-      "Jump over an opponent's piece to the empty square immediately beyond it. Captures are mandatory. If another capture is available after a jump, it must also be made. A piece may jump in a different diagonal direction on a multiple jump.",
+      "Jump over an opponent's piece to an empty square beyond it. Captures are mandatory. If another capture is available after a jump, it must also be made.",
     king: "King:",
-    kingText:
-      "A piece that reaches the last row becomes a king and can move one square diagonally forward or backward.",
+    flyingKingText:
+      "A piece that reaches the last row becomes a king. Kings can move any number of empty squares diagonally and capture an opponent from a distance, landing on any empty square beyond it.",
+    britishKingText:
+      "A piece that reaches the last row becomes a king. Kings move one square diagonally forward or backward and capture by jumping an adjacent piece.",
     endOfGame: "End of game:",
     endOfGameText:
       "A player wins by capturing all opposing pieces or leaving the opponent with no legal moves. A draw occurs if neither side can force a win, or after 30 moves by kings without a capture.",
@@ -51,15 +56,20 @@ const translations = {
     sound: "Son activé/désactivé",
     forcedHighlight: "Indiquer les prises obligatoires",
     language: "Langue",
+    ruleset: "Variante",
+    flyingKings: "Dames volantes",
+    britishDraughts: "Dames anglaises",
     simpleMove: "Déplacement simple :",
     simpleMoveText:
       "Déplacez un pion d'une case en diagonale vers l'avant, sur une case foncée adjacente inoccupée.",
     jump: "Prise d'un pion adverse :",
     jumpText:
-      "Sautez par-dessus un pion adverse jusqu'à la case vide située juste après. Les prises sont obligatoires. Si une autre prise est possible après un saut, elle doit également être effectuée. Lors d'une prise multiple, le pion peut changer de diagonale.",
+      "Sautez par-dessus un pion adverse jusqu'à une case vide située après lui. Les prises sont obligatoires. Si une autre prise est possible après un saut, elle doit également être effectuée.",
     king: "Dame :",
-    kingText:
-      "Lorsqu'un pion atteint la dernière rangée, il devient une dame et peut se déplacer d'une case en diagonale vers l'avant ou vers l'arrière.",
+    flyingKingText:
+      "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Elle peut se déplacer en diagonale sur plusieurs cases libres et prendre un pion adverse à distance en atterrissant sur une case libre après celui-ci.",
+    britishKingText:
+      "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Elle se déplace d'une case en diagonale vers l'avant ou l'arrière et prend en sautant par-dessus un pion adjacent.",
     endOfGame: "Fin de partie :",
     endOfGameText:
       "Un joueur gagne en prenant tous les pions adverses ou en empêchant l'adversaire de jouer. La partie est nulle si aucun camp ne peut forcer la victoire, ou après 30 déplacements de dames sans prise.",
@@ -87,6 +97,11 @@ class Board {
       savedLanguage === "en" || savedLanguage === "fr"
         ? savedLanguage
         : getPreferredLanguage();
+    const savedRuleset = localStorage.getItem("ruleset");
+    this.ruleset =
+      savedRuleset === "british" || savedRuleset === "flying"
+        ? savedRuleset
+        : "flying";
     this.applyLanguage();
     this.game = document.getElementById("game");
     this.colorPlay = "piece-white";
@@ -151,6 +166,35 @@ class Board {
     if (this.isPlaying && this.colorPlay === "piece-white") {
       document.getElementById("messages").textContent =
         this.translate("whiteTurn");
+    }
+  }
+
+  setRuleset(ruleset) {
+    if (ruleset !== "flying" && ruleset !== "british") {
+      throw new RangeError(`Unsupported ruleset: ${ruleset}`);
+    }
+    this.ruleset = ruleset;
+    localStorage.setItem("ruleset", ruleset);
+
+    if (!this.isPlaying || this.colorPlay !== "piece-white") {
+      return;
+    }
+
+    document.querySelectorAll(".possible, .moving").forEach((square) => {
+      square.classList.remove("possible", "moving");
+    });
+    const whitePieces = document.querySelectorAll(".piece-white");
+    whitePieces.forEach((piece) => {
+      piece.classList.remove("highlight");
+      piece.movable = true;
+    });
+    this.takeIt = [];
+    this.needTake = [];
+    if (!this.checkIfcanTake(whitePieces)) {
+      whitePieces.forEach((piece) => {
+        piece.movable = true;
+        this.checkpossibleMove(piece);
+      });
     }
   }
 
@@ -679,6 +723,57 @@ class Board {
     const pieceId = parseInt(movPiece.parentNode.id);
     // get piece position
     let possibleMoves = [];
+    if (movPiece.isKing && this.ruleset === "flying") {
+      const directions = [
+        [-1, -1],
+        [-1, 1],
+        [1, -1],
+        [1, 1]
+      ];
+      const row = Math.floor(pieceId / 8);
+      const column = pieceId % 8;
+      const flyingMoves = [];
+      const flyingCaptures = [];
+
+      directions.forEach(([rowStep, columnStep]) => {
+        let nextRow = row + rowStep;
+        let nextColumn = column + columnStep;
+        let enemySquareId = null;
+        while (
+          nextRow >= 0 &&
+          nextRow < 8 &&
+          nextColumn >= 0 &&
+          nextColumn < 8
+        ) {
+          const squareId = nextRow * 8 + nextColumn;
+          const square = document.getElementById(squareId);
+          if (!square.hasChildNodes()) {
+            if (enemySquareId === null) {
+              flyingMoves.push(squareId);
+            } else {
+              flyingCaptures.push([movPiece, enemySquareId, squareId]);
+            }
+          } else if (
+            enemySquareId === null &&
+            !square.firstChild.classList.contains(pieceColor)
+          ) {
+            enemySquareId = squareId;
+          } else {
+            break;
+          }
+          nextRow += rowStep;
+          nextColumn += columnStep;
+        }
+      });
+
+      if (flyingCaptures.length > 0) {
+        this.needTake.push(movPiece);
+        flyingCaptures.forEach((capture) => this.takeIt.push(capture));
+        return flyingCaptures.map((capture) => capture[2]);
+      }
+      return flyingMoves;
+    }
+
     // check if is a isKing
     if (movPiece.isKing) {
       possibleMoves.push(pieceId - 9);
@@ -985,6 +1080,7 @@ class Menu {
   // Menu options
   options() {
     const menu = document.getElementById("menu");
+    menu.classList.add("menu-options");
     menu.innerHTML = `
     <div id="close-menu"><i class="far fa-times-circle"></i></div>
     <div class="menu-item" id="options">${board.translate("options")}</div>
@@ -1036,6 +1132,19 @@ class Menu {
                            }>Français</option>
                          </select>
                        </div>`;
+    menu.innerHTML += `<div id="ruleset-control">
+                           <label class="submenu" for="ruleset-select">${board.translate(
+                             "ruleset"
+                           )}</label>
+                           <select id="ruleset-select">
+                             <option value="flying" ${
+                               board.ruleset === "flying" ? "selected" : ""
+                             }>${board.translate("flyingKings")}</option>
+                             <option value="british" ${
+                               board.ruleset === "british" ? "selected" : ""
+                             }>${board.translate("britishDraughts")}</option>
+                           </select>
+                         </div>`;
     menu.innerHTML += `<div class="submenu" id="back"><i class="fa fa-backward" aria-hidden="true"></i>
                        </div>`;
 
@@ -1065,6 +1174,11 @@ class Menu {
       this.options();
     });
 
+    document.getElementById("ruleset-select").addEventListener("change", (e) => {
+      board.setRuleset(e.target.value);
+      this.options();
+    });
+
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
       board.playSound("menu");
@@ -1090,7 +1204,9 @@ class Menu {
     <p class="text-g">${board.translate("jump")}</p>
     <p>${board.translate("jumpText")}</p>
     <p class="text-g">${board.translate("king")}</p>
-    <p>${board.translate("kingText")}</p>
+    <p>${board.translate(
+      board.ruleset === "flying" ? "flyingKingText" : "britishKingText"
+    )}</p>
     <p class="text-g">${board.translate("endOfGame")}</p>
     <p>${board.translate("endOfGameText")}</p>
     <div class="submenu" id="rules-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
