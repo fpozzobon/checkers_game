@@ -1,8 +1,93 @@
 //Board class that create and command the game
 /*jshint esversion: 6 */
+const translations = {
+  en: {
+    title: "Checkers Game",
+    description:
+      "Play checkers with the computer for free, no sign-in required, easy to use, classic Checkers game!",
+    whiteTurn: "White's turn",
+    blackWinsPieces: "No pieces left, Black wins!",
+    whiteWinsPieces: "Congratulations!!!!\n\nNo pieces left, White wins!",
+    blackWinsMoves: "No moves left, Black wins!",
+    whiteWinsMoves: "Congratulations!!!!\n\nNo moves left, White wins!",
+    startGame: "Start Game!",
+    resetGame: "Reset Game!",
+    options: "Options",
+    rules: "Rules",
+    results: "Results",
+    sound: "Sound On/Off",
+    forcedHighlight: "Forced capture highlight",
+    language: "Language",
+    simpleMove: "Simple move:",
+    simpleMoveText:
+      "Move a piece one square diagonally forward to an adjacent unoccupied dark square.",
+    jump: "Jump (capture an opponent's piece):",
+    jumpText:
+      "Jump over an opponent's piece to the empty square immediately beyond it. Captures are mandatory. If another capture is available after a jump, it must also be made. A piece may jump in a different diagonal direction on a multiple jump.",
+    king: "King:",
+    kingText:
+      "A piece that reaches the last row becomes a king and can move one square diagonally forward or backward.",
+    endOfGame: "End of game:",
+    endOfGameText:
+      "A player wins by capturing all opposing pieces or leaving the opponent with no legal moves. A draw occurs if neither side can force a win, or after 30 moves by kings without a capture.",
+    player: "Player",
+    computer: "Computer",
+    resetScore: "Reset Score"
+  },
+  fr: {
+    title: "Jeu de dames",
+    description:
+      "Jouez aux dames gratuitement contre l'ordinateur, sans inscription. Un jeu de dames classique, simple à utiliser !",
+    whiteTurn: "Aux Blancs de jouer",
+    blackWinsPieces: "Il ne reste plus de pions, les Noirs gagnent !",
+    whiteWinsPieces: "Félicitations !\n\nIl ne reste plus de pions, les Blancs gagnent !",
+    blackWinsMoves: "Les Blancs ne peuvent plus jouer, les Noirs gagnent !",
+    whiteWinsMoves: "Félicitations !\n\nLes Noirs ne peuvent plus jouer, les Blancs gagnent !",
+    startGame: "Commencer",
+    resetGame: "Recommencer",
+    options: "Options",
+    rules: "Règles",
+    results: "Résultats",
+    sound: "Son activé/désactivé",
+    forcedHighlight: "Indiquer les prises obligatoires",
+    language: "Langue",
+    simpleMove: "Déplacement simple :",
+    simpleMoveText:
+      "Déplacez un pion d'une case en diagonale vers l'avant, sur une case foncée adjacente inoccupée.",
+    jump: "Prise d'un pion adverse :",
+    jumpText:
+      "Sautez par-dessus un pion adverse jusqu'à la case vide située juste après. Les prises sont obligatoires. Si une autre prise est possible après un saut, elle doit également être effectuée. Lors d'une prise multiple, le pion peut changer de diagonale.",
+    king: "Dame :",
+    kingText:
+      "Lorsqu'un pion atteint la dernière rangée, il devient une dame et peut se déplacer d'une case en diagonale vers l'avant ou vers l'arrière.",
+    endOfGame: "Fin de partie :",
+    endOfGameText:
+      "Un joueur gagne en prenant tous les pions adverses ou en empêchant l'adversaire de jouer. La partie est nulle si aucun camp ne peut forcer la victoire, ou après 30 déplacements de dames sans prise.",
+    player: "Joueur",
+    computer: "Ordinateur",
+    resetScore: "Réinitialiser les scores"
+  }
+};
+
+function getPreferredLanguage() {
+  const preferredLanguage =
+    navigator.languages && navigator.languages.length > 0
+      ? navigator.languages[0]
+      : navigator.language;
+  return preferredLanguage && /^fr(?:-|$)/i.test(preferredLanguage)
+    ? "fr"
+    : "en";
+}
+
 class Board {
   // Method to create the board
   constructor() {
+    const savedLanguage = localStorage.getItem("language");
+    this.language =
+      savedLanguage === "en" || savedLanguage === "fr"
+        ? savedLanguage
+        : getPreferredLanguage();
+    this.applyLanguage();
     this.game = document.getElementById("game");
     this.colorPlay = "piece-white";
     this.whiteKing = false;
@@ -43,6 +128,32 @@ class Board {
       this.game.appendChild(newDiv);
     }
   }
+
+  translate(key) {
+    return translations[this.language][key];
+  }
+
+  applyLanguage() {
+    document.documentElement.lang = this.language;
+    document.title = this.translate("title");
+    document
+      .querySelector('meta[name="description"]')
+      .setAttribute("content", this.translate("description"));
+  }
+
+  setLanguage(language) {
+    if (language !== "en" && language !== "fr") {
+      throw new RangeError(`Unsupported language: ${language}`);
+    }
+    this.language = language;
+    localStorage.setItem("language", language);
+    this.applyLanguage();
+    if (this.isPlaying && this.colorPlay === "piece-white") {
+      document.getElementById("messages").textContent =
+        this.translate("whiteTurn");
+    }
+  }
+
   // Method to start the game
   startGame() {
     /* Start the game*/
@@ -57,7 +168,7 @@ class Board {
     this.turn += 1;
     if (this.colorPlay == "piece-white") {
       const message = document.getElementById("messages");
-      message.innerHTML = "White's turn";
+      message.textContent = this.translate("whiteTurn");
       // check if white pieces can take
       // freeze black pieces
       let blackPieces = document.querySelectorAll(".piece-black");
@@ -484,22 +595,22 @@ class Board {
     });
 
     if (whitePieces.length == 0) {
-      alert("No pieces left, Black wins!");
+      alert(this.translate("blackWinsPieces"));
       this.updateScore("black");
       location.reload();
       return -1;
     } else if (blackPieces.length == 0) {
-      alert("Congratulations!!!!\n\nNo pieces left, White wins!");
+      alert(this.translate("whiteWinsPieces"));
       this.updateScore("white");
       location.reload();
       return -1;
     } else if (whitePiecesLeft == 0) {
-      alert("No moves left, Black wins!");
+      alert(this.translate("blackWinsMoves"));
       this.updateScore("black");
       location.reload();
       return -1;
     } else if (blackPiecesLeft == 0) {
-      alert("Congratulations!!!!\n\nNo moves left, White wins!");
+      alert(this.translate("whiteWinsMoves"));
       this.updateScore("white");
       location.reload();
       return -1;
@@ -807,14 +918,18 @@ class Menu {
     menu.classList.add("menu");
     menu.innerHTML = `<div id="close-menu"><i class="far fa-times-circle"></i></div>`;
     if (board.isPlaying) {
-      menu.innerHTML += `<div class="menu-item" id="new-game">Reset Game!</div>`;
+      menu.innerHTML += `<div class="menu-item" id="new-game">${board.translate(
+        "resetGame"
+      )}</div>`;
     } else {
-      menu.innerHTML += `<div class="menu-item" id="new-game">Start Game!</div>`;
+      menu.innerHTML += `<div class="menu-item" id="new-game">${board.translate(
+        "startGame"
+      )}</div>`;
     }
     menu.innerHTML += `
-        <div class="menu-item" id="options">Options</div>
-        <div class="menu-item" id="rules">Rules</div>
-        <div class="menu-item" id="results">Results</div>`;
+        <div class="menu-item" id="options">${board.translate("options")}</div>
+        <div class="menu-item" id="rules">${board.translate("rules")}</div>
+        <div class="menu-item" id="results">${board.translate("results")}</div>`;
     board.game.appendChild(menu);
 
     document.getElementById("close-menu").addEventListener("click", () => {
@@ -872,34 +987,55 @@ class Menu {
     const menu = document.getElementById("menu");
     menu.innerHTML = `
     <div id="close-menu"><i class="far fa-times-circle"></i></div>
-    <div class="menu-item" id="options">Options</div>
+    <div class="menu-item" id="options">${board.translate("options")}</div>
     `;
     if (board.optionSound) {
-      menu.innerHTML += `<div class="submenu" id="sound"><span class="space">Sound On/Off</span>  
+      menu.innerHTML += `<div class="submenu" id="sound"><span class="space">${board.translate(
+        "sound"
+      )}</span>
                         <label class="switch" id="sound-switch">
                         <input type="checkbox" checked>
                         <span class="slider round"></span>
                         </label></div>`;
     } else {
-      menu.innerHTML += `<div class="submenu" id="sound"><span class="space">Sound On/Off</span>
+      menu.innerHTML += `<div class="submenu" id="sound"><span class="space">${board.translate(
+        "sound"
+      )}</span>
                         <label class="switch" id="sound-switch">
                         <input type="checkbox">
                         <span class="slider round"></span>
                         </label></div>`;
     }
     if (board.optionHighlight) {
-      menu.innerHTML += `<div class="submenu" id="highlight"><span class="space-s">Forced Highlight  </span>
+      menu.innerHTML += `<div class="submenu" id="highlight"><span class="space-s">${board.translate(
+        "forcedHighlight"
+      )}</span>
                           <label class="switch" id="highlight-switch">
                           <input type="checkbox" checked>
                           <span class="slider round"></span>
                           </label></div>`;
     } else {
-      menu.innerHTML += `<div class="submenu" id="highlight"><span class="space-s">Forced Highlight</span>
+      menu.innerHTML += `<div class="submenu" id="highlight"><span class="space-s">${board.translate(
+        "forcedHighlight"
+      )}</span>
                           <label class="switch" id="highlight-switch">
                           <input type="checkbox">
                           <span class="slider round"></span>
                           </label></div>`;
     }
+    menu.innerHTML += `<div id="language-control">
+                         <label class="submenu" for="language-select">${board.translate(
+                           "language"
+                         )}</label>
+                         <select id="language-select">
+                           <option value="en" ${
+                             board.language === "en" ? "selected" : ""
+                           }>English</option>
+                           <option value="fr" ${
+                             board.language === "fr" ? "selected" : ""
+                           }>Français</option>
+                         </select>
+                       </div>`;
     menu.innerHTML += `<div class="submenu" id="back"><i class="fa fa-backward" aria-hidden="true"></i>
                        </div>`;
 
@@ -924,6 +1060,11 @@ class Menu {
       }
     });
 
+    document.getElementById("language-select").addEventListener("change", (e) => {
+      board.setLanguage(e.target.value);
+      this.options();
+    });
+
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
       board.playSound("menu");
@@ -943,26 +1084,15 @@ class Menu {
     menu.classList.add("menu-rules");
     menu.innerHTML = `
     <div id="close-menu"><i class="far fa-times-circle"></i></div>
-    <div class="menu-item new-page" id="options">Rules</div>
-    <p class="text-g">Simple move:</p> 
-    <p>Moving a piece one square to the front, diagonally to an adjacent 
-    unoccupied dark square.</p> 
-    <p class="text-g">Jump (take an opponent piece):</p><p>Jumping over an opponent's piece, 
-    to an empty square immediately to the opposite square (forward only).
-    Jumping is always mandatory: if a player has the option to jump, they must take it. 
-    If there are more pieces to be taken, they have to be taken.
-    Multiple jumps are mandatory if they can be made.
-    Multiple jumps are possible if, after one jump, another piece is immediately eligible to 
-    be jumped by the moving piece, even if that jump is in a 
-    different diagonal direction.
-    Kings</p><p class="text-g">King:</p> 
-    <p>If a piece moves into the last row, it gains the ability to move both forward and 
-    backward. One square per turn.</p>
-    <p class="text-g">End of game</p> 
-    <p>A player wins by capturing all of the opponent's pieces or by leaving the opponent 
-    with no legal move. 
-    The game is a draw if neither side can force a win.
-    A draw will also occur after 30 moves made just by jungs without piece taking.</p>
+    <div class="menu-item new-page" id="options">${board.translate("rules")}</div>
+    <p class="text-g">${board.translate("simpleMove")}</p>
+    <p>${board.translate("simpleMoveText")}</p>
+    <p class="text-g">${board.translate("jump")}</p>
+    <p>${board.translate("jumpText")}</p>
+    <p class="text-g">${board.translate("king")}</p>
+    <p>${board.translate("kingText")}</p>
+    <p class="text-g">${board.translate("endOfGame")}</p>
+    <p>${board.translate("endOfGameText")}</p>
     <div class="submenu" id="rules-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
 
     // add event listeners
@@ -985,13 +1115,19 @@ class Menu {
     menu.classList.add("menu");
     menu.innerHTML = `
     <div id="close-menu"><i class="far fa-times-circle"></i></div>
-    <div class="menu-item new-page" id="results">Results</div>`;
+    <div class="menu-item new-page" id="results">${board.translate("results")}</div>`;
     // add scores
     let plyerScore = localStorage.getItem("whiteScore");
     let computerScore = localStorage.getItem("blackScore");
-    menu.innerHTML += `<p class="submenu results-menu" id="player-score">Player  ${plyerScore}</p>`;
-    menu.innerHTML += `<p class="submenu results-menu" id="computer-score">Computer  ${computerScore}</p>`;
-    menu.innerHTML += `<div class="submenu results-menu" id="reset-score">Reset Score</div>`;
+    menu.innerHTML += `<p class="submenu results-menu" id="player-score">${board.translate(
+      "player"
+    )}  ${plyerScore}</p>`;
+    menu.innerHTML += `<p class="submenu results-menu" id="computer-score">${board.translate(
+      "computer"
+    )}  ${computerScore}</p>`;
+    menu.innerHTML += `<div class="submenu results-menu" id="reset-score">${board.translate(
+      "resetScore"
+    )}</div>`;
     menu.innerHTML += `<div class="submenu results-menu" id="rules-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
@@ -1010,8 +1146,12 @@ class Menu {
       board.playSound("menu");
       localStorage.setItem("whiteScore", 0);
       localStorage.setItem("blackScore", 0);
-      document.getElementById("player-score").innerHTML = "Player 0";
-      document.getElementById("computer-score").innerHTML = "Computer 0";
+      document.getElementById("player-score").textContent = `${board.translate(
+        "player"
+      )} 0`;
+      document.getElementById("computer-score").textContent = `${board.translate(
+        "computer"
+      )} 0`;
     });
   }
 
