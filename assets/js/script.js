@@ -105,7 +105,7 @@ class Board {
       });
       //random to computer move, sound more
       let timeMove = Math.random() * 2000 + 1200;
-      setTimeout(board.computerMove, timeMove);
+      setTimeout(() => board.computerMove(), timeMove);
     }
     board.pieceTaking = null;
   }
@@ -241,23 +241,20 @@ class Board {
 
   // Method to move the black piece automatically and take if possible
   computerMove() {
-    /* Method to move the black piece automatically and take if possible*/
-    board.takeIt = [];
-    board.needTake = [];
-    let whiteCounter = 0;
-    // get all black pieces
+    /* Method to move the black piece automatically and take if possible */
     const blackPieces = document.querySelectorAll(".piece-black");
-    // check if black pieces can take
-    if (board.checkIfcanTake(blackPieces)) {
-      while (board.checkIfcanTake(blackPieces) || whiteCounter > 5) {
-        // take a piece
+    let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : blackPieces;
+    let captureOptions = this.getComputerCaptures(piecesToCheck);
+    let captureCount = 0;
+
+    if (captureOptions.length > 0) {
+      while (captureOptions.length > 0 && captureCount < 12) {
+        this.takeIt = captureOptions;
         board.takePiece();
-        board.takeIt = [];
-        board.needTake = [];
-        whiteCounter++;
+        captureCount++;
+        captureOptions = this.getComputerCaptures([this.pieceTaking]);
       }
     } else {
-      // move a piece
       board.moveComputerPiece();
     }
     this.pieceTaking = null;
@@ -265,91 +262,145 @@ class Board {
     board.gameControl();
   }
 
+  getComputerCaptures(pieces) {
+    this.takeIt = [];
+    this.needTake = [];
+    pieces.forEach((piece) => {
+      this.checkpossibleMove(piece);
+    });
+    return this.takeIt.slice();
+  }
+
+  scoreComputerMove(piece, destination, capturedSquare = null) {
+    const source = piece.parentNode;
+    const capturedPiece = capturedSquare ? capturedSquare.firstChild : null;
+    const wasKing = piece.isKing;
+
+    source.removeChild(piece);
+    destination.appendChild(piece);
+    if (capturedPiece) {
+      capturedSquare.removeChild(capturedPiece);
+    }
+
+    const promotes = !wasKing && Number(destination.id) > 55;
+    if (promotes) {
+      piece.isKing = true;
+    }
+
+    let immediateCaptures = 0;
+    let capturesOfMovedPiece = 0;
+    const whitePieces = document.querySelectorAll(".piece-white");
+    whitePieces.forEach((whitePiece) => {
+      this.takeIt = [];
+      this.needTake = [];
+      this.checkpossibleMove(whitePiece);
+      this.takeIt.forEach((capture) => {
+        immediateCaptures++;
+        if (capture[1] == destination.id) {
+          capturesOfMovedPiece++;
+        }
+      });
+    });
+
+    this.takeIt = [];
+    this.needTake = [];
+    const mobility = this.checkpossibleMove(piece).length;
+    const row = Math.floor(Number(destination.id) / 8);
+    const column = Number(destination.id) % 8;
+    const centerDistance = Math.abs(column - 3.5) + Math.abs(row - 3.5);
+    const score =
+      row * 2 +
+      mobility * 2 -
+      centerDistance +
+      (promotes ? 80 : 0) -
+      capturesOfMovedPiece * 100 -
+      (immediateCaptures - capturesOfMovedPiece) * 10;
+
+    piece.isKing = wasKing;
+    source.appendChild(piece);
+    if (capturedPiece) {
+      capturedSquare.appendChild(capturedPiece);
+    }
+
+    this.takeIt = [];
+    this.needTake = [];
+    return score;
+  }
+
   // take a piece
   takePiece() {
     /* Method to take a piece */
-    let group;
+    let group = null;
     let piece;
     let enemySquare;
     let oppositeSquare;
-    // if it is retaking
-    if (board.pieceTaking != null) {
-      for (let i = 0; i < board.takeIt.length; i++) {
-        group = board.takeIt[i];
-        if (group[0] == this.pieceTaking) {
-          board.playSound("take");
-          piece = group[0];
-          enemySquare = document.getElementById(group[1]);
-          oppositeSquare = document.getElementById(group[2]);
-          piece.parentNode.innerHTML = "";
-          oppositeSquare.appendChild(piece);
-          // add piece to removed
-          let blackCapture = document.getElementById("removedb");
-          const outPiece = enemySquare.firstChild;
-          outPiece.classList.remove("piece-white");
-          outPiece.classList.add("piece-out-white");
-          blackCapture.appendChild(outPiece);
-          // remove from board
-          enemySquare.innerHTML = "";
-          enemySquare.setAttribute("occupied", "false");
-          oppositeSquare.setAttribute("occupied", "true");
-          return true;
-        }
+    let bestScore = -Infinity;
+
+    board.takeIt.forEach((option) => {
+      if (this.pieceTaking && option[0] != this.pieceTaking) {
+        return;
       }
-    } else {
-      // if it is the first time
-      for (let i = 0; i < board.takeIt.length; i++) {
-        board.playSound("take");
-        group = board.takeIt[i];
-        piece = group[0];
-        this.pieceTaking = piece;
-        enemySquare = document.getElementById(group[1]);
-        oppositeSquare = document.getElementById(group[2]);
-        // add piece to removed
-        let blackCapture = document.getElementById("removedb");
-        const outPiece = enemySquare.firstChild;
-        outPiece.classList.remove("piece-white");
-        outPiece.classList.add("piece-out-white");
-        blackCapture.appendChild(outPiece);
-        // move the piece
-        piece.parentNode.innerHTML = "";
-        oppositeSquare.appendChild(piece);
-        enemySquare.innerHTML = "";
-        enemySquare.setAttribute("occupied", "false");
-        oppositeSquare.setAttribute("occupied", "true");
-        return true;
+      const target = document.getElementById(option[2]);
+      const victim = document.getElementById(option[1]);
+      const score = this.scoreComputerMove(option[0], target, victim);
+      if (score > bestScore) {
+        bestScore = score;
+        group = option;
       }
+    });
+
+    if (!group) {
+      return false;
     }
+
+    board.playSound("take");
+    piece = group[0];
+    this.pieceTaking = piece;
+    enemySquare = document.getElementById(group[1]);
+    oppositeSquare = document.getElementById(group[2]);
+    const blackCapture = document.getElementById("removedb");
+    const outPiece = enemySquare.firstChild;
+    outPiece.classList.remove("piece-white");
+    outPiece.classList.add("piece-out-white");
+    blackCapture.appendChild(outPiece);
+    piece.parentNode.removeChild(piece);
+    oppositeSquare.appendChild(piece);
+    enemySquare.innerHTML = "";
+    enemySquare.setAttribute("occupied", "false");
+    oppositeSquare.setAttribute("occupied", "true");
+    return true;
   }
 
   // Method to move a piece
   moveComputerPiece() {
     /* Method to move a piece */
-    let allMoves = {};
-    let tempId = -1;
-    let tempMoves = [];
+    let bestMove = null;
+    let bestScore = -Infinity;
     const blackPieces = document.querySelectorAll(".piece-black");
-    // check pieces that can move
-    blackPieces.forEach((item) => {
-      board.playSound("move");
-      tempMoves = this.checkpossibleMove(item);
-      if (tempMoves.length > 0) {
-        tempId = item.id;
-        allMoves[tempId] = tempMoves;
-      }
+    blackPieces.forEach((piece) => {
+      const possibleMoves = this.checkpossibleMove(piece);
+      possibleMoves.forEach((moveId) => {
+        const destination = document.getElementById(moveId);
+        const score = this.scoreComputerMove(piece, destination);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = [piece, destination];
+        }
+      });
     });
-    const keys = Object.keys(allMoves);
-    const pieceId = keys[Math.floor(Math.random() * keys.length)]; //random piece
-    let possibleMoves = allMoves[pieceId];
-    const piece = document.getElementById(pieceId);
-    const pieceSquare = piece.parentNode;
-    // move the piece
-    const toSquareId = possibleMoves[0];
-    const toSquare = document.getElementById(toSquareId);
-    toSquare.appendChild(piece);
-    toSquare.setAttribute("occupied", "true");
-    pieceSquare.setAttribute("occupied", "false");
-    pieceSquare.innerHTML = "";
+
+    if (!bestMove) {
+      return false;
+    }
+
+    const piece = bestMove[0];
+    const destination = bestMove[1];
+    const source = piece.parentNode;
+    board.playSound("move");
+    destination.appendChild(piece);
+    destination.setAttribute("occupied", "true");
+    source.setAttribute("occupied", "false");
+    return true;
   }
 
   // Method to check if there is forced take for the pieces
