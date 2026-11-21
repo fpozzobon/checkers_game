@@ -897,6 +897,7 @@ class Board {
 
   // Method to enable drag-to-move on a piece
   setupPieceDrag(piece) {
+    piece.draggable = false;
     let dragStarted = false;
     let startX = 0;
     let startY = 0;
@@ -917,6 +918,7 @@ class Board {
       if (!piece.movable || event.button !== 0) {
         return;
       }
+      event.preventDefault();
       dragStarted = false;
       startX = event.clientX;
       startY = event.clientY;
@@ -924,6 +926,10 @@ class Board {
       grabOffsetX = event.clientX - rect.left;
       grabOffsetY = event.clientY - rect.top;
       piece.setPointerCapture(event.pointerId);
+    });
+
+    piece.addEventListener("dragstart", (event) => {
+      event.preventDefault();
     });
 
     piece.addEventListener("pointermove", (event) => {
