@@ -148,6 +148,9 @@ class Board {
   // Method to add click event listeners
   pieceClick(e) {
     /* Method to add click event listeners to the pieces*/
+    if (e.target.suppressClick) {
+      return false;
+    }
     const moving = document.querySelectorAll(".moving");
     moving.forEach((item) => {
       item.classList.remove("moving");
@@ -640,6 +643,18 @@ class Board {
     let dragStarted = false;
     let startX = 0;
     let startY = 0;
+    let dragPreview = null;
+    let grabOffsetX = 0;
+    let grabOffsetY = 0;
+
+    const removeDragPreview = () => {
+      if (dragPreview) {
+        dragPreview.remove();
+        dragPreview = null;
+      }
+      piece.classList.remove("dragging");
+      piece.style.pointerEvents = "";
+    };
 
     piece.addEventListener("pointerdown", (event) => {
       if (!piece.movable || event.button !== 0) {
@@ -648,6 +663,9 @@ class Board {
       dragStarted = false;
       startX = event.clientX;
       startY = event.clientY;
+      const rect = piece.getBoundingClientRect();
+      grabOffsetX = event.clientX - rect.left;
+      grabOffsetY = event.clientY - rect.top;
       piece.setPointerCapture(event.pointerId);
     });
 
@@ -660,14 +678,20 @@ class Board {
         dragStarted = true;
         board.pieceClick({ target: piece });
         piece.classList.add("dragging");
+
         const rect = piece.getBoundingClientRect();
-        piece.style.width = rect.width + "px";
-        piece.style.height = rect.height + "px";
+        dragPreview = piece.cloneNode(false);
+        dragPreview.removeAttribute("id");
+        dragPreview.classList.add("drag-preview");
+        dragPreview.style.width = rect.width + "px";
+        dragPreview.style.height = rect.height + "px";
+        dragPreview.style.left = event.clientX - grabOffsetX + "px";
+        dragPreview.style.top = event.clientY - grabOffsetY + "px";
+        document.body.appendChild(dragPreview);
       }
       if (dragStarted) {
-        const rect = piece.getBoundingClientRect();
-        piece.style.left = event.clientX - rect.width / 2 + "px";
-        piece.style.top = event.clientY - rect.height / 2 + "px";
+        dragPreview.style.left = event.clientX - grabOffsetX + "px";
+        dragPreview.style.top = event.clientY - grabOffsetY + "px";
       }
     });
 
@@ -681,11 +705,7 @@ class Board {
         return;
       }
 
-      piece.classList.remove("dragging");
-      piece.style.left = "";
-      piece.style.top = "";
-      piece.style.width = "";
-      piece.style.height = "";
+      removeDragPreview();
 
       // Ignore the synthetic click generated after a drag.
       piece.suppressClick = true;
@@ -693,7 +713,6 @@ class Board {
         piece.suppressClick = false;
       }, 100);
 
-      piece.style.pointerEvents = "";
       const target = document.elementFromPoint(event.clientX, event.clientY);
       const square = target ? target.closest(".square") : null;
       if (square && square.classList.contains("possible")) {
@@ -703,11 +722,7 @@ class Board {
     });
 
     piece.addEventListener("pointercancel", () => {
-      piece.classList.remove("dragging");
-      piece.style.left = "";
-      piece.style.top = "";
-      piece.style.width = "";
-      piece.style.height = "";
+      removeDragPreview();
       dragStarted = false;
     });
   }

@@ -81,10 +81,15 @@ body {
 }
 
 .piece.dragging {
+  cursor: grabbing;
+  opacity: 0.45;
+}
+
+.drag-preview {
   position: fixed;
   z-index: 1000;
-  cursor: grabbing;
   pointer-events: none;
+  cursor: grabbing;
   box-shadow: 1.2vmin 1.2vmin 0.8vmin rgba(20, 11, 7, 0.55);
   transform: scale(1.08);
 }
