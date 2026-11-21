@@ -265,7 +265,8 @@ body {
 }
 
 #language-control,
-#ruleset-control {
+#ruleset-control,
+#difficulty-control {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -274,7 +275,8 @@ body {
 }
 
 #language-select,
-#ruleset-select {
+#ruleset-select,
+#difficulty-select {
   max-width: 22vmin;
   padding: 0.3vmin;
   border: 1px solid rgb(255, 255, 255);

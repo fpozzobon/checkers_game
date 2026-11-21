@@ -25,6 +25,10 @@ const translations = {
     ruleset: "Rule set",
     flyingKings: "Flying kings",
     britishDraughts: "British draughts",
+    difficulty: "Difficulty",
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard",
     simpleMove: "Simple move:",
     simpleMoveText:
       "Move a piece one square diagonally forward to an adjacent unoccupied dark square.",
@@ -67,6 +71,10 @@ const translations = {
     ruleset: "Variante",
     flyingKings: "Dames volantes",
     britishDraughts: "Dames anglaises",
+    difficulty: "Difficulté",
+    easy: "Facile",
+    medium: "Intermédiaire",
+    hard: "Difficile",
     simpleMove: "Déplacement simple :",
     simpleMoveText:
       "Déplacez un pion d'une case en diagonale vers l'avant, sur une case foncée adjacente inoccupée.",
@@ -110,6 +118,13 @@ class Board {
       savedRuleset === "british" || savedRuleset === "flying"
         ? savedRuleset
         : "flying";
+    const savedDifficulty = localStorage.getItem("difficulty");
+    this.difficulty =
+      savedDifficulty === "easy" ||
+      savedDifficulty === "medium" ||
+      savedDifficulty === "hard"
+        ? savedDifficulty
+        : "easy";
     this.applyLanguage();
     this.game = document.getElementById("game");
     this.colorPlay = "piece-white";
@@ -218,6 +233,18 @@ class Board {
     }
   }
 
+  setDifficulty(difficulty) {
+    if (
+      difficulty !== "easy" &&
+      difficulty !== "medium" &&
+      difficulty !== "hard"
+    ) {
+      throw new RangeError(`Unsupported difficulty: ${difficulty}`);
+    }
+    this.difficulty = difficulty;
+    localStorage.setItem("difficulty", difficulty);
+  }
+
   // Method to start the game
   startGame() {
     /* Start the game*/
@@ -274,7 +301,14 @@ class Board {
         item.movable = false;
         this.checkpossibleMove(item);
       });
-      let timeMove = Math.random() * 2000 + 1200;
+      let timeMove;
+      if (this.difficulty === "easy") {
+        timeMove = Math.random() * 2000 + 1800;
+      } else if (this.difficulty === "medium") {
+        timeMove = Math.random() * 1300 + 1200;
+      } else {
+        timeMove = Math.random() * 700 + 550;
+      }
       setTimeout(() => board.computerMove(), timeMove);
     }
     board.pieceTaking = null;
@@ -514,8 +548,19 @@ class Board {
     let enemySquare;
     let oppositeSquare;
     let bestScore = -Infinity;
+    const validOptions = board.takeIt.filter((option) => {
+      return !this.pieceTaking || option[0] == this.pieceTaking;
+    });
 
-    board.takeIt.forEach((option) => {
+    if (
+      validOptions.length > 0 &&
+      (this.difficulty === "easy" ||
+        (this.difficulty === "medium" && Math.random() < 0.35))
+    ) {
+      group =
+        validOptions[Math.floor(Math.random() * validOptions.length)];
+    } else {
+      validOptions.forEach((option) => {
       if (this.pieceTaking && option[0] != this.pieceTaking) {
         return;
       }
@@ -526,7 +571,8 @@ class Board {
         bestScore = score;
         group = option;
       }
-    });
+      });
+    }
 
     if (!group) {
       return false;
@@ -558,18 +604,33 @@ class Board {
     /* Method to move a piece */
     let bestMove = null;
     let bestScore = -Infinity;
+    const possibleMoves = [];
     const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
     computerPieces.forEach((piece) => {
-      const possibleMoves = this.checkpossibleMove(piece);
-      possibleMoves.forEach((moveId) => {
+      const pieceMoves = this.checkpossibleMove(piece);
+      pieceMoves.forEach((moveId) => {
         const destination = document.getElementById(moveId);
         const score = this.scoreComputerMove(piece, destination);
+        possibleMoves.push([piece, destination, score]);
         if (score > bestScore) {
           bestScore = score;
           bestMove = [piece, destination];
         }
       });
     });
+
+    if (possibleMoves.length > 0) {
+      if (this.difficulty === "easy") {
+        bestMove =
+          possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+      } else if (
+        this.difficulty === "medium" &&
+        Math.random() < 0.35
+      ) {
+        bestMove =
+          possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+      }
+    }
 
     if (!bestMove) {
       return false;
@@ -1230,6 +1291,22 @@ class Menu {
                              }>${board.translate("britishDraughts")}</option>
                            </select>
                          </div>`;
+    menu.innerHTML += `<div id="difficulty-control">
+                           <label class="submenu" for="difficulty-select">${board.translate(
+                             "difficulty"
+                           )}</label>
+                           <select id="difficulty-select">
+                             <option value="easy" ${
+                               board.difficulty === "easy" ? "selected" : ""
+                             }>${board.translate("easy")}</option>
+                             <option value="medium" ${
+                               board.difficulty === "medium" ? "selected" : ""
+                             }>${board.translate("medium")}</option>
+                             <option value="hard" ${
+                               board.difficulty === "hard" ? "selected" : ""
+                             }>${board.translate("hard")}</option>
+                           </select>
+                         </div>`;
     menu.innerHTML += `<div class="submenu" id="back"><i class="fa fa-backward" aria-hidden="true"></i>
                        </div>`;
 
@@ -1263,6 +1340,13 @@ class Menu {
       board.setRuleset(e.target.value);
       this.options();
     });
+
+    document
+      .getElementById("difficulty-select")
+      .addEventListener("change", (e) => {
+        board.setDifficulty(e.target.value);
+        board.playSound("menu");
+      });
 
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
