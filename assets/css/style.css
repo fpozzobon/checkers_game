@@ -163,6 +163,10 @@ body {
   z-index: 2;
 }
 
+#menu:not(.is-playing) #close-menu {
+  display: none;
+}
+
 .menu-options {
   height: auto;
   min-height: max(170px, 65vmin);
@@ -213,6 +217,14 @@ body {
 .menu-item:hover {
   font-size: max(11px, 5vmin);
   letter-spacing: 0.1rem;
+}
+.color-prompt {
+  margin-top: max(25px, 4vmin);
+  cursor: default;
+}
+.color-prompt:hover {
+  font-size: max(10px, 5vmin);
+  letter-spacing: normal;
 }
 #new-game {
   /* margin-top: 7vmin; */

@@ -4,7 +4,7 @@ A technical walkthrough of how the Checkers game is built. For the player-facing
 
 ## Overview
 
-The game is a static, dependency-free web app: plain HTML, CSS and vanilla JavaScript (ES6 classes). There is no build step and no backend. A human plays **white** (bottom of the board) against a computer playing **black** (top of the board).
+The game is a static, dependency-free web app: plain HTML, CSS and vanilla JavaScript (ES6 classes). There is no build step and no backend. After clicking Start Game, the player chooses white (bottom) or black (top); the computer plays the other color.
 
 ```
 .
@@ -40,6 +40,7 @@ Owns the game state and rules. A single global instance, `board`, is created at 
 | State | Purpose |
 |---|---|
 | `colorPlay` | Whose turn it is: `"piece-white"` or `"piece-black"` |
+| `playerColor`, `computerColor` | The selected human side and the opposite computer side |
 | `needTake` | Pieces that currently have a mandatory capture |
 | `takeIt` | Capture descriptors: `[piece, enemySquareId, landingSquareId]` |
 | `pieceTaking` | Piece in the middle of a multi-capture (computer only) |
@@ -53,11 +54,11 @@ Key methods:
 |---|---|
 | `constructor` | Builds the 64 squares, initialises `localStorage` scores |
 | `startGame` | Creates pieces, installs `movestart` guard, starts first turn |
-| `gameControl` | Turn dispatcher. Freezes/unfreezes pieces, promotes kings, schedules `checkWinner`, and for black's turn schedules `computerMove` after a random 1.2–3.2 s delay |
+| `gameControl` | Turn dispatcher. Freezes/unfreezes pieces, promotes kings, schedules `checkWinner`, and schedules `computerMove` when it is the computer's turn |
 | `createPieces` | Places 12 pieces per side on the dark squares |
 | `pieceClick` | Selects a movable piece and highlights its target squares |
 | `movePiece` | Executes the human's move, handles capture and multi-capture |
-| `computerMove` | Black's turn: capture if forced, otherwise move a random piece |
+| `computerMove` | Computer's turn: capture if forced, otherwise make a move |
 | `takePiece` / `moveComputerPiece` | The computer's capture and plain-move implementations |
 | `checkpossibleMove` | Core move generator for one piece (see below) |
 | `canTake` | Tests whether an adjacent enemy can be jumped |
@@ -71,7 +72,7 @@ Key methods:
 Thin wrapper that creates a `<div class="piece piece-{color}">`. `get_piece(id)` assigns the element id and returns it. King status is stored as an expando property on the DOM element (`element.isKing`), and `element.movable` is used the same way.
 
 ### `Menu`
-Builds and swaps the in-board menu panel: main menu, Options, Rules and Results sub-screens, plus the small cog button shown when the menu is hidden. Menu HTML is generated via `innerHTML` template strings and listeners are attached after each render.
+Builds and swaps the in-board menu panel: main menu, color choice, Options, Rules and Results sub-screens, plus the small cog button shown when the menu is hidden. The menu cannot be hidden until a game starts. Menu HTML is generated via `innerHTML` template strings and listeners are attached after each render.
 
 ## Data model
 
@@ -98,22 +99,24 @@ White men move up, black men move down, kings move in all four. Edge squares are
 ```
 startGame()
    └─ gameControl()
-        ├─ White's turn
-        │    ├─ freeze black, promote black kings, schedule checkWinner
-        │    ├─ checkIfcanTake(white)  → only capturing pieces are movable (+ highlight)
-        │    └─ otherwise all white pieces are movable
+        ├─ Player's turn
+        │    ├─ freeze computer pieces and promote them; schedule checkWinner
+        │    ├─ checkIfcanTake(player) → only capturing pieces are movable (+ highlight)
+        │    └─ otherwise all player pieces are movable
         │         user clicks piece → pieceClick → target squares get .possible
         │         user clicks square → movePiece
         │              ├─ capture? remove enemy, move it to the tray
         │              ├─ can capture again? keep the turn
         │              └─ invertPlayerTurn(); gameControl()
-        └─ Black's turn
-             ├─ freeze white, promote white kings, schedule checkWinner
+        └─ Computer's turn
+             ├─ freeze player pieces and promote them; schedule checkWinner
              └─ setTimeout(computerMove, 1.2–3.2 s)
                   ├─ forced capture → takePiece()
-                  └─ else → moveComputerPiece() (random piece, first legal target)
+                  └─ else → moveComputerPiece() (choose a legal move)
                   invertPlayerTurn(); gameControl()
 ```
+
+White always moves first, so choosing black gives the computer the opening move.
 
 ### How `checkpossibleMove` works
 1. Resolve the piece (argument, or the one with class `.moving`).

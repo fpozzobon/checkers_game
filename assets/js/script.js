@@ -6,6 +6,10 @@ const translations = {
     description:
       "Play checkers with the computer for free, no sign-in required, easy to use, classic Checkers game!",
     whiteTurn: "White's turn",
+    blackTurn: "Black's turn",
+    chooseColor: "Choose your color",
+    white: "White",
+    black: "Black",
     blackWinsPieces: "No pieces left, Black wins!",
     whiteWinsPieces: "Congratulations!!!!\n\nNo pieces left, White wins!",
     blackWinsMoves: "No moves left, Black wins!",
@@ -44,6 +48,10 @@ const translations = {
     description:
       "Jouez aux dames gratuitement contre l'ordinateur, sans inscription. Un jeu de dames classique, simple à utiliser !",
     whiteTurn: "Aux Blancs de jouer",
+    blackTurn: "Aux Noirs de jouer",
+    chooseColor: "Choisissez votre couleur",
+    white: "Blancs",
+    black: "Noirs",
     blackWinsPieces: "Il ne reste plus de pions, les Noirs gagnent !",
     whiteWinsPieces: "Félicitations !\n\nIl ne reste plus de pions, les Blancs gagnent !",
     blackWinsMoves: "Les Blancs ne peuvent plus jouer, les Noirs gagnent !",
@@ -105,6 +113,8 @@ class Board {
     this.applyLanguage();
     this.game = document.getElementById("game");
     this.colorPlay = "piece-white";
+    this.playerColor = "piece-white";
+    this.computerColor = "piece-black";
     this.whiteKing = false;
     this.blackKing = false;
     this.needTake = []; // save pieces that need to take
@@ -163,10 +173,20 @@ class Board {
     this.language = language;
     localStorage.setItem("language", language);
     this.applyLanguage();
-    if (this.isPlaying && this.colorPlay === "piece-white") {
+    if (this.isPlaying && this.colorPlay === this.playerColor) {
       document.getElementById("messages").textContent =
-        this.translate("whiteTurn");
+        this.translate(
+          this.playerColor === "piece-white" ? "whiteTurn" : "blackTurn"
+        );
     }
+  }
+
+  setPlayerColor(color) {
+    if (color !== "white" && color !== "black") {
+      throw new RangeError(`Unsupported player color: ${color}`);
+    }
+    this.playerColor = `piece-${color}`;
+    this.computerColor = color === "white" ? "piece-black" : "piece-white";
   }
 
   setRuleset(ruleset) {
@@ -176,22 +196,22 @@ class Board {
     this.ruleset = ruleset;
     localStorage.setItem("ruleset", ruleset);
 
-    if (!this.isPlaying || this.colorPlay !== "piece-white") {
+    if (!this.isPlaying || this.colorPlay !== this.playerColor) {
       return;
     }
 
     document.querySelectorAll(".possible, .moving").forEach((square) => {
       square.classList.remove("possible", "moving");
     });
-    const whitePieces = document.querySelectorAll(".piece-white");
-    whitePieces.forEach((piece) => {
+    const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+    playerPieces.forEach((piece) => {
       piece.classList.remove("highlight");
       piece.movable = true;
     });
     this.takeIt = [];
     this.needTake = [];
-    if (!this.checkIfcanTake(whitePieces)) {
-      whitePieces.forEach((piece) => {
+    if (!this.checkIfcanTake(playerPieces)) {
+      playerPieces.forEach((piece) => {
         piece.movable = true;
         this.checkpossibleMove(piece);
       });
@@ -210,55 +230,50 @@ class Board {
   gameControl() {
     /* Method to control the game turns*/
     this.turn += 1;
-    if (this.colorPlay == "piece-white") {
+    if (this.colorPlay === this.playerColor) {
       const message = document.getElementById("messages");
-      message.textContent = this.translate("whiteTurn");
-      // check if white pieces can take
-      // freeze black pieces
-      let blackPieces = document.querySelectorAll(".piece-black");
-      blackPieces.forEach((item) => {
+      message.textContent = this.translate(
+        this.playerColor === "piece-white" ? "whiteTurn" : "blackTurn"
+      );
+      const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+      computerPieces.forEach((item) => {
         item.movable = false;
         item.addEventListener("click", this.pieceClick);
       });
-      this.promoteToKing(blackPieces);
+      this.promoteToKing(computerPieces);
       setTimeout(() => {
         this.checkWinner();
       }, 1000);
 
-      // check if white pieces can take
-      let whitePieces = document.querySelectorAll(".piece-white");
-      if (!this.checkIfcanTake(whitePieces)) {
-        // unfreeze white pieces
-        whitePieces.forEach((item) => {
+      const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+      if (!this.checkIfcanTake(playerPieces)) {
+        playerPieces.forEach((item) => {
           item.movable = true;
           item.addEventListener("click", this.pieceClick);
           this.checkpossibleMove(item);
         });
       }
-    } else if (this.colorPlay == "piece-black") {
+    } else {
       const message = document.getElementById("messages");
       message.innerHTML = "";
-      // remove highlight from white pieces
       let highlightPieces = document.querySelectorAll(".highlight");
       highlightPieces.forEach((item) => {
         item.classList.remove("highlight");
       });
 
-      //freeze white pieces
-      const whitePieces = document.querySelectorAll(".piece-white");
-      whitePieces.forEach((item) => {
+      const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+      playerPieces.forEach((item) => {
         item.movable = false;
       });
-      this.promoteToKing(whitePieces);
+      this.promoteToKing(playerPieces);
       setTimeout(() => {
         this.checkWinner();
       }, 1000);
-      const blackPieces = document.querySelectorAll(".piece-black");
-      blackPieces.forEach((item) => {
+      const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+      computerPieces.forEach((item) => {
         item.movable = false;
         this.checkpossibleMove(item);
       });
-      //random to computer move, sound more
       let timeMove = Math.random() * 2000 + 1200;
       setTimeout(() => board.computerMove(), timeMove);
     }
@@ -356,19 +371,22 @@ class Board {
             board.playSound("take");
             // remove enemy piece
             const enemySquare = document.getElementById(enemySquareId);
-            // add piece board score
-            let whiteCapture = document.getElementById("removedw");
             const outPiece = enemySquare.firstChild;
-            outPiece.classList.remove("piece-black");
-            outPiece.classList.add("piece-out-black");
-            whiteCapture.appendChild(outPiece);
+            const capturedColor = outPiece.classList.contains("piece-white")
+              ? "white"
+              : "black";
+            outPiece.classList.remove(`piece-${capturedColor}`);
+            outPiece.classList.add(`piece-out-${capturedColor}`);
+            const captureTray = document.getElementById(
+              piece.classList.contains("piece-white") ? "removedw" : "removedb"
+            );
+            captureTray.appendChild(outPiece);
             // remove from board
             enemySquare.innerHTML = "";
             enemySquare.setAttribute("occupied", "false");
             // check if can take again
             board.takeIt = [];
             board.needTake = [];
-            //get white pieces
             if (board.checkIfcanTake([piece])) {
               board.needTake = [];
               board.takeIt = [];
@@ -394,11 +412,11 @@ class Board {
     }
   }
 
-  // Method to move the black piece automatically and take if possible
+  // Method to move the computer piece automatically and take if possible
   computerMove() {
-    /* Method to move the black piece automatically and take if possible */
-    const blackPieces = document.querySelectorAll(".piece-black");
-    let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : blackPieces;
+    /* Method to move the computer piece automatically and take if possible */
+    const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+    let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : computerPieces;
     let captureOptions = this.getComputerCaptures(piecesToCheck);
     let captureCount = 0;
 
@@ -437,18 +455,23 @@ class Board {
       capturedSquare.removeChild(capturedPiece);
     }
 
-    const promotes = !wasKing && Number(destination.id) > 55;
+    const destinationId = Number(destination.id);
+    const promotes =
+      !wasKing &&
+      (this.computerColor === "piece-white"
+        ? destinationId < 8
+        : destinationId > 55);
     if (promotes) {
       piece.isKing = true;
     }
 
     let immediateCaptures = 0;
     let capturesOfMovedPiece = 0;
-    const whitePieces = document.querySelectorAll(".piece-white");
-    whitePieces.forEach((whitePiece) => {
+    const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+    playerPieces.forEach((playerPiece) => {
       this.takeIt = [];
       this.needTake = [];
-      this.checkpossibleMove(whitePiece);
+      this.checkpossibleMove(playerPiece);
       this.takeIt.forEach((capture) => {
         immediateCaptures++;
         if (capture[1] == destination.id) {
@@ -463,8 +486,9 @@ class Board {
     const row = Math.floor(Number(destination.id) / 8);
     const column = Number(destination.id) % 8;
     const centerDistance = Math.abs(column - 3.5) + Math.abs(row - 3.5);
+    const advancement = this.computerColor === "piece-white" ? -row : row;
     const score =
-      row * 2 +
+      advancement * 2 +
       mobility * 2 -
       centerDistance +
       (promotes ? 80 : 0) -
@@ -513,11 +537,14 @@ class Board {
     this.pieceTaking = piece;
     enemySquare = document.getElementById(group[1]);
     oppositeSquare = document.getElementById(group[2]);
-    const blackCapture = document.getElementById("removedb");
     const outPiece = enemySquare.firstChild;
-    outPiece.classList.remove("piece-white");
-    outPiece.classList.add("piece-out-white");
-    blackCapture.appendChild(outPiece);
+    const playerColor = this.playerColor.slice("piece-".length);
+    outPiece.classList.remove(this.playerColor);
+    outPiece.classList.add(`piece-out-${playerColor}`);
+    const captureTray = document.getElementById(
+      this.computerColor === "piece-white" ? "removedw" : "removedb"
+    );
+    captureTray.appendChild(outPiece);
     piece.parentNode.removeChild(piece);
     oppositeSquare.appendChild(piece);
     enemySquare.innerHTML = "";
@@ -531,8 +558,8 @@ class Board {
     /* Method to move a piece */
     let bestMove = null;
     let bestScore = -Infinity;
-    const blackPieces = document.querySelectorAll(".piece-black");
-    blackPieces.forEach((piece) => {
+    const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+    computerPieces.forEach((piece) => {
       const possibleMoves = this.checkpossibleMove(piece);
       possibleMoves.forEach((moveId) => {
         const destination = document.getElementById(moveId);
@@ -572,7 +599,7 @@ class Board {
     if (this.needTake.length > 0) {
       this.needTake.forEach((item) => {
         item.movable = true;
-        if (this.optionHighlight && item.classList.contains("piece-white")) {
+        if (this.optionHighlight && item.classList.contains(this.playerColor)) {
           item.classList.add("highlight");
         }
       });
@@ -613,12 +640,14 @@ class Board {
     Input (str): Color of the piece
     */
 
-    let score = localStorage.getItem(color + "Score");
+    const scoreKey =
+      `piece-${color}` === this.playerColor ? "whiteScore" : "blackScore";
+    let score = localStorage.getItem(scoreKey);
     if (score == null) {
       score = 0;
     } else {
       score = parseInt(score) + 1;
-      localStorage.setItem(color + "Score", String(score));
+      localStorage.setItem(scoreKey, String(score));
     }
   }
 
@@ -1017,6 +1046,9 @@ class Menu {
     const menu = document.createElement("div");
     menu.id = "menu";
     menu.classList.add("menu");
+    if (board.isPlaying) {
+      menu.classList.add("is-playing");
+    }
     menu.innerHTML = `<div id="close-menu"><i class="far fa-times-circle"></i></div>`;
     if (board.isPlaying) {
       menu.innerHTML += `<div class="menu-item" id="new-game">${board.translate(
@@ -1034,9 +1066,7 @@ class Menu {
     board.game.appendChild(menu);
 
     document.getElementById("close-menu").addEventListener("click", () => {
-      board.playSound("menu");
-      this.hiddenMenu();
-      board.menuIsOpen = false;
+      this.closeMenu();
     });
     document.getElementById("new-game").addEventListener("click", () => {
       board.playSound("menu");
@@ -1044,10 +1074,7 @@ class Menu {
         this.hiddenMenu();
         location.reload();
       } else {
-        board.startGame();
-        board.isPlaying = true;
-        board.menuIsOpen = false;
-        this.hiddenMenu();
+        this.chooseColor();
       }
     });
     document.getElementById("options").addEventListener("click", () => {
@@ -1063,8 +1090,57 @@ class Menu {
       this.results();
     });
   }
+
+  chooseColor() {
+    const menu = document.getElementById("menu");
+    menu.innerHTML = `
+      <div id="close-menu"><i class="far fa-times-circle"></i></div>
+      <div class="menu-item color-prompt">${board.translate("chooseColor")}</div>
+      <div class="menu-item" id="play-white">${board.translate("white")}</div>
+      <div class="menu-item" id="play-black">${board.translate("black")}</div>
+      <div class="submenu rules-back" id="color-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
+
+    document.getElementById("close-menu").addEventListener("click", () => {
+      this.closeMenu();
+    });
+
+    document.getElementById("color-back").addEventListener("click", () => {
+      board.playSound("menu");
+      this.clearMenu();
+      this.createMenu();
+    });
+
+    const startGame = (color) => {
+      board.playSound("menu");
+      board.setPlayerColor(color);
+      board.startGame();
+      board.isPlaying = true;
+      board.menuIsOpen = false;
+      this.hiddenMenu();
+    };
+
+    document.getElementById("play-white").addEventListener("click", () => {
+      startGame("white");
+    });
+    document.getElementById("play-black").addEventListener("click", () => {
+      startGame("black");
+    });
+  }
+
+  closeMenu() {
+    if (!board.isPlaying) {
+      return;
+    }
+    board.playSound("menu");
+    this.hiddenMenu();
+    board.menuIsOpen = false;
+  }
+
   //Hidden menu method
   hiddenMenu() {
+    if (!board.isPlaying) {
+      return;
+    }
     const smallMenu = document.createElement("div");
     smallMenu.classList.add("menu-hidden");
     board.game.appendChild(smallMenu);
@@ -1187,9 +1263,7 @@ class Menu {
 
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
-      board.playSound("menu");
-      this.hiddenMenu();
-      board.menuIsOpen = false;
+      this.closeMenu();
     });
 
     document.getElementById("back").addEventListener("click", () => {
@@ -1219,9 +1293,7 @@ class Menu {
 
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
-      board.playSound("menu");
-      this.hiddenMenu();
-      board.menuIsOpen = false;
+      this.closeMenu();
     });
 
     document.getElementById("rules-back").addEventListener("click", () => {
@@ -1253,9 +1325,7 @@ class Menu {
     menu.innerHTML += `<div class="submenu results-menu" id="rules-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
-      board.playSound("menu");
-      this.hiddenMenu();
-      board.menuIsOpen = false;
+      this.closeMenu();
     });
 
     document.getElementById("rules-back").addEventListener("click", () => {
