@@ -72,7 +72,7 @@ Key methods:
 Thin wrapper that creates a `<div class="piece piece-{color}">`. `get_piece(id)` assigns the element id and returns it. King status is stored as an expando property on the DOM element (`element.isKing`), and `element.movable` is used the same way.
 
 ### `Menu`
-Builds and swaps the in-board menu panel: main menu, color choice, Options, Rules and Results sub-screens, plus the small cog button shown when the menu is hidden. The menu cannot be hidden until a game starts. Menu HTML is generated via `innerHTML` template strings and listeners are attached after each render.
+Builds and swaps the in-board menu panel: main menu, color choice, Options, Rules and Results sub-screens, plus the small cog button shown when the menu is hidden. The menu cannot be hidden until a game starts; during a game, clicking outside it closes it. Menu HTML is generated via `innerHTML` template strings and listeners are attached after each render.
 
 ## Data model
 

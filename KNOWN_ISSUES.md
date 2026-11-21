@@ -39,9 +39,6 @@ The landing square is `enemySquareId + relation` and `document.getElementById(..
 ### 6. Undefined `this.notify` sound (read from code)
 `playSound("notify")` references `this.notify`, which is never created. Nothing calls it today, but it would throw.
 
-### 7. Possible duplicate cog buttons (read from code)
-`hiddenMenu()` appends a new `.menu-hidden` element each time it is called and the old one does not appear to be removed when the menu reopens. Worth checking by opening and closing the menu repeatedly.
-
 ## Rules text vs behaviour
 
 The in-game Rules screen says things the code does not do:

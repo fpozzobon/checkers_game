@@ -1043,6 +1043,9 @@ class Menu {
 
   createMenu() {
     /* Create menu */
+    document.querySelectorAll(".menu-hidden").forEach((button) => {
+      button.remove();
+    });
     const menu = document.createElement("div");
     menu.id = "menu";
     menu.classList.add("menu");
@@ -1357,3 +1360,17 @@ class Menu {
 const board = new Board();
 const menu = new Menu();
 menu.createMenu();
+document.addEventListener("click", (event) => {
+  if (!board.isPlaying || !board.menuIsOpen) {
+    return;
+  }
+  const openMenu = document.getElementById("menu");
+  if (
+    !openMenu ||
+    openMenu.contains(event.target) ||
+    event.target.closest(".menu-hidden")
+  ) {
+    return;
+  }
+  menu.closeMenu();
+}, true);
