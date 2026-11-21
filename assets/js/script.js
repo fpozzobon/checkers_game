@@ -634,6 +634,83 @@ class Board {
       }
     }
   }
+
+  // Method to enable drag-to-move on a piece
+  setupPieceDrag(piece) {
+    let dragStarted = false;
+    let startX = 0;
+    let startY = 0;
+
+    piece.addEventListener("pointerdown", (event) => {
+      if (!piece.movable || event.button !== 0) {
+        return;
+      }
+      dragStarted = false;
+      startX = event.clientX;
+      startY = event.clientY;
+      piece.setPointerCapture(event.pointerId);
+    });
+
+    piece.addEventListener("pointermove", (event) => {
+      if (!piece.hasPointerCapture(event.pointerId)) {
+        return;
+      }
+      const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
+      if (!dragStarted && distance > 6) {
+        dragStarted = true;
+        board.pieceClick({ target: piece });
+        piece.classList.add("dragging");
+        const rect = piece.getBoundingClientRect();
+        piece.style.width = rect.width + "px";
+        piece.style.height = rect.height + "px";
+      }
+      if (dragStarted) {
+        const rect = piece.getBoundingClientRect();
+        piece.style.left = event.clientX - rect.width / 2 + "px";
+        piece.style.top = event.clientY - rect.height / 2 + "px";
+      }
+    });
+
+    piece.addEventListener("pointerup", (event) => {
+      if (!piece.hasPointerCapture(event.pointerId)) {
+        return;
+      }
+      piece.releasePointerCapture(event.pointerId);
+
+      if (!dragStarted) {
+        return;
+      }
+
+      piece.classList.remove("dragging");
+      piece.style.left = "";
+      piece.style.top = "";
+      piece.style.width = "";
+      piece.style.height = "";
+
+      // Ignore the synthetic click generated after a drag.
+      piece.suppressClick = true;
+      setTimeout(() => {
+        piece.suppressClick = false;
+      }, 100);
+
+      piece.style.pointerEvents = "";
+      const target = document.elementFromPoint(event.clientX, event.clientY);
+      const square = target ? target.closest(".square") : null;
+      if (square && square.classList.contains("possible")) {
+        board.movePiece({ target: square });
+      }
+      dragStarted = false;
+    });
+
+    piece.addEventListener("pointercancel", () => {
+      piece.classList.remove("dragging");
+      piece.style.left = "";
+      piece.style.top = "";
+      piece.style.width = "";
+      piece.style.height = "";
+      dragStarted = false;
+    });
+  }
 }
 
 // Piece class to create pieces
@@ -648,6 +725,7 @@ class Piece {
   // create a new piece
   get_piece(id) {
     this.piece.id = id;
+    board.setupPieceDrag(this.piece);
     return this.piece;
   }
 }
