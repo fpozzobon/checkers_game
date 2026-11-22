@@ -1121,13 +1121,53 @@ class Board {
     let startX = 0;
     let startY = 0;
     let dragPreview = null;
+    let dropTarget = null;
     let grabOffsetX = 0;
     let grabOffsetY = 0;
+
+    const findDropTarget = (x, y) => {
+      let closestSquare = null;
+      let closestDistance = Infinity;
+      document.querySelectorAll(".possible").forEach((square) => {
+        const rect = square.getBoundingClientRect();
+        const distance = Math.hypot(
+          x - (rect.left + rect.width / 2),
+          y - (rect.top + rect.height / 2)
+        );
+        if (
+          distance <= Math.min(rect.width, rect.height) * 0.75 &&
+          distance < closestDistance
+        ) {
+          closestSquare = square;
+          closestDistance = distance;
+        }
+      });
+      return closestSquare;
+    };
+
+    const updateDropTarget = (x, y) => {
+      const nextTarget = findDropTarget(x, y);
+      if (nextTarget === dropTarget) {
+        return dropTarget;
+      }
+      if (dropTarget) {
+        dropTarget.classList.remove("drop-target");
+      }
+      dropTarget = nextTarget;
+      if (dropTarget) {
+        dropTarget.classList.add("drop-target");
+      }
+      return dropTarget;
+    };
 
     const removeDragPreview = () => {
       if (dragPreview) {
         dragPreview.remove();
         dragPreview = null;
+      }
+      if (dropTarget) {
+        dropTarget.classList.remove("drop-target");
+        dropTarget = null;
       }
       piece.classList.remove("dragging");
       piece.style.pointerEvents = "";
@@ -1172,8 +1212,21 @@ class Board {
         document.body.appendChild(dragPreview);
       }
       if (dragStarted) {
-        dragPreview.style.left = event.clientX - grabOffsetX + "px";
-        dragPreview.style.top = event.clientY - grabOffsetY + "px";
+        const targetSquare = updateDropTarget(event.clientX, event.clientY);
+        if (targetSquare) {
+          const targetRect = targetSquare.getBoundingClientRect();
+          dragPreview.style.left =
+            targetRect.left +
+            (targetRect.width - dragPreview.offsetWidth) / 2 +
+            "px";
+          dragPreview.style.top =
+            targetRect.top +
+            (targetRect.height - dragPreview.offsetHeight) / 2 +
+            "px";
+        } else {
+          dragPreview.style.left = event.clientX - grabOffsetX + "px";
+          dragPreview.style.top = event.clientY - grabOffsetY + "px";
+        }
       }
     });
 
@@ -1187,6 +1240,7 @@ class Board {
         return;
       }
 
+      const snappedSquare = findDropTarget(event.clientX, event.clientY);
       removeDragPreview();
 
       // Ignore the synthetic click generated after a drag.
@@ -1196,7 +1250,7 @@ class Board {
       }, 100);
 
       const target = document.elementFromPoint(event.clientX, event.clientY);
-      let square = target ? target.closest(".square") : null;
+      let square = snappedSquare || (target ? target.closest(".square") : null);
       if (square && !square.classList.contains("possible")) {
         const capture = board.takeIt
           .filter(
