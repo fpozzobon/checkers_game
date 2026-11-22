@@ -10,10 +10,12 @@ const translations = {
     chooseColor: "Choose your color",
     white: "White",
     black: "Black",
-    blackWinsPieces: "No pieces left, Black wins!",
-    whiteWinsPieces: "Congratulations!!!!\n\nNo pieces left, White wins!",
-    blackWinsMoves: "No moves left, Black wins!",
-    whiteWinsMoves: "Congratulations!!!!\n\nNo moves left, White wins!",
+    blackWinsPieces: "Black wins!",
+    whiteWinsPieces: "White wins!",
+    blackWinsMoves: "Black wins!",
+    whiteWinsMoves: "White wins!",
+    gameOver: "Game over",
+    ok: "OK",
     startGame: "Start Game!",
     resetGame: "Reset Game!",
     options: "Options",
@@ -56,10 +58,12 @@ const translations = {
     chooseColor: "Choisissez votre couleur",
     white: "Blancs",
     black: "Noirs",
-    blackWinsPieces: "Il ne reste plus de pions, les Noirs gagnent !",
-    whiteWinsPieces: "Félicitations !\n\nIl ne reste plus de pions, les Blancs gagnent !",
-    blackWinsMoves: "Les Blancs ne peuvent plus jouer, les Noirs gagnent !",
-    whiteWinsMoves: "Félicitations !\n\nLes Noirs ne peuvent plus jouer, les Blancs gagnent !",
+    blackWinsPieces: "Les Noirs gagnent !",
+    whiteWinsPieces: "Les Blancs gagnent !",
+    blackWinsMoves: "Les Noirs gagnent !",
+    whiteWinsMoves: "Les Blancs gagnent !",
+    gameOver: "Fin de la partie",
+    ok: "OK",
     startGame: "Commencer",
     resetGame: "Recommencer",
     options: "Options",
@@ -144,6 +148,7 @@ class Board {
     this.optionSound = true;
     this.menuIsOpen = true;
     this.isPlaying = false;
+    this.gameOver = false;
 
     // prepare for score saving
     if (localStorage.getItem("whiteScore") == null) {
@@ -248,6 +253,7 @@ class Board {
   // Method to start the game
   startGame() {
     /* Start the game*/
+    this.gameOver = false;
     this.createPieces();
     this.removeMoving();
     this.gameControl();
@@ -449,6 +455,10 @@ class Board {
   // Method to move the computer piece automatically and take if possible
   computerMove() {
     /* Method to move the computer piece automatically and take if possible */
+    if (this.gameOver) {
+      return;
+    }
+
     const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
     let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : computerPieces;
     let captureOptions = this.getComputerCaptures(piecesToCheck);
@@ -715,6 +725,10 @@ class Board {
   // check winner
   checkWinner() {
     /* Check if there is a winner */
+    if (this.gameOver) {
+      return -1;
+    }
+
     let whitePiecesLeft = 0;
     let blackPiecesLeft = 0;
 
@@ -729,26 +743,57 @@ class Board {
     });
 
     if (whitePieces.length == 0) {
-      alert(this.translate("blackWinsPieces"));
       this.updateScore("black");
-      location.reload();
+      this.showGameOver(this.translate("blackWinsPieces"));
       return -1;
     } else if (blackPieces.length == 0) {
-      alert(this.translate("whiteWinsPieces"));
       this.updateScore("white");
-      location.reload();
+      this.showGameOver(this.translate("whiteWinsPieces"));
       return -1;
     } else if (whitePiecesLeft == 0) {
-      alert(this.translate("blackWinsMoves"));
       this.updateScore("black");
-      location.reload();
+      this.showGameOver(this.translate("blackWinsMoves"));
       return -1;
     } else if (blackPiecesLeft == 0) {
-      alert(this.translate("whiteWinsMoves"));
       this.updateScore("white");
-      location.reload();
+      this.showGameOver(this.translate("whiteWinsMoves"));
       return -1;
     }
+  }
+
+  showGameOver(message) {
+    this.gameOver = true;
+    const overlay = document.createElement("div");
+    overlay.id = "game-over";
+    overlay.className = "game-over";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "game-over-title");
+
+    const card = document.createElement("div");
+    card.className = "game-over-card";
+    const heading = document.createElement("h2");
+    heading.id = "game-over-title";
+    heading.textContent = this.translate("gameOver");
+    const result = document.createElement("p");
+    result.textContent = message;
+    const button = document.createElement("button");
+    button.className = "game-over-button";
+    button.type = "button";
+    button.textContent = this.translate("ok");
+
+    card.append(heading, result, button);
+    overlay.appendChild(card);
+    this.game.appendChild(overlay);
+
+    const returnToMenu = () => location.reload();
+    button.addEventListener("click", returnToMenu);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        returnToMenu();
+      }
+    });
+    button.focus();
   }
 
   // play sound

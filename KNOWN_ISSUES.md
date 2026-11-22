@@ -65,7 +65,7 @@ The in-game Rules screen says things the code does not do:
 - **`innerHTML` string templates** in `Menu` repeat the same close/back wiring in four places and could share a helper.
 - **`updateScore`** has a redundant null-branch (scores are initialised in the constructor).
 - **`turn` counter** is incremented but never used.
-- **Win/loss handling** uses blocking `alert()` followed by `location.reload()`, which also discards settings (sound, highlight). A modal and a soft reset would be friendlier.
+- **Win/loss handling** now uses an in-game dialog; acknowledging it reloads to the main menu and resets the board. Reloading still resets in-memory settings such as sound and highlighting.
 - **Accessibility:** pieces and squares are not keyboard-accessible and have no ARIA labels. Menu items are `div`s rather than buttons.
 - **Font Awesome** is loaded twice, v4.7 CSS and v5.0.6 JS. Only one is needed (the code uses v5 class names such as `far fa-times-circle`).
 - **`favicon.ico?`** in `index.html` has a stray `?`.

@@ -94,6 +94,81 @@ body {
   transform: scale(1.08);
 }
 
+.game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(15, 13, 12, 0.78);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.game-over-card {
+  width: min(100%, 380px);
+  padding: 32px 28px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #a9602e, #713b1e);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: default;
+  text-align: center;
+  animation: game-over-appear 180ms ease-out;
+}
+
+.game-over-card h2 {
+  margin: 0 0 14px;
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-size: clamp(26px, 5vmin, 38px);
+  font-weight: normal;
+  text-shadow: 2px 3px 4px rgba(0, 0, 0, 0.45);
+}
+
+.game-over-card p {
+  margin: 0 0 24px;
+  font-size: clamp(18px, 3vmin, 22px);
+  text-align: center;
+}
+
+.game-over-button {
+  min-width: 120px;
+  padding: 10px 24px;
+  border: 0;
+  border-radius: 999px;
+  background: #f6e5c7;
+  color: #542d18;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.game-over-button:hover {
+  transform: translateY(-2px);
+  background: #fff5e3;
+}
+
+.game-over-button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+@keyframes game-over-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .piece-white {
   background-image: url("../images/white_piece.png");
   background-color: rgb(167, 61, 61);
