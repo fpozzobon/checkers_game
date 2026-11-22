@@ -1410,7 +1410,10 @@ class Menu {
     if (!board.isPlaying) {
       return;
     }
-    const smallMenu = document.createElement("div");
+    const smallMenu = document.createElement("button");
+    smallMenu.type = "button";
+    smallMenu.setAttribute("aria-label", board.translate("menu"));
+    smallMenu.setAttribute("title", board.translate("menu"));
     smallMenu.classList.add("menu-hidden");
     board.game.appendChild(smallMenu);
     board.game.removeChild(document.getElementById("menu"));

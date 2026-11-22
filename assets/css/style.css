@@ -362,17 +362,31 @@ body {
   color: rgb(0, 0, 0);
 }
 .menu-hidden {
-  margin-left: 83.5vmin;
-  margin-top: -2.5vmin;
-  text-align: justify;
-  width: max(12px, 4vmin);
-  height: max(12px, 4vmin);
-  cursor: pointer;
-  position: absolute;
-  font-size: 4.5vmin;
-  color: rgb(155, 91, 46);
+  position: fixed;
+  right: 2vmin;
+  top: calc(5vh + 104px);
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  background: rgb(80, 40, 11);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
   text-align: center;
-  z-index: 2;
+  cursor: pointer;
+  font-size: 20px;
+  color: #fff;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.menu-hidden:hover {
+  transform: scale(1.08);
+  background: rgb(155, 91, 46);
+}
+.menu-hidden:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
 }
 .menu-item {
   margin: 0;
