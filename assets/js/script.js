@@ -167,7 +167,8 @@ class Board {
         : "easy";
     this.applyLanguage();
     this.game = document.getElementById("game");
-    this.colorPlay = "piece-white";
+    this.pieceElements = Array(64).fill(null);
+    this.piecePositions = new WeakMap();
     this.playerColor = "piece-white";
     this.computerColor = "piece-black";
     this.whiteKing = false;
@@ -226,32 +227,41 @@ class Board {
     }
   }
 
-  syncPositionFromDOM() {
-    const squares = Array(64).fill(null);
-    document.querySelectorAll(".square").forEach((square) => {
-      const piece = square.firstChild;
-      if (!piece || !piece.classList.contains("piece")) return;
-      squares[Number(square.id)] = {
-        color: piece.classList.contains("piece-white") ? "white" : "black",
-        king: Boolean(piece.isKing)
-      };
-    });
-    this.gameState = new GameState({
-      squares,
-      turn: this.colorPlay === "piece-white" ? "white" : "black",
-      ruleset: this.ruleset,
-      revision: this.gameState.revision
-    });
-    return this.gameState;
+  getPieces(color) {
+    return this.gameState.squares.reduce((pieces, piece, square) => {
+      if (piece && piece.color === color && this.pieceElements[square]) {
+        pieces.push(this.pieceElements[square]);
+      }
+      return pieces;
+    }, []);
+  }
+
+  updatePieceElement(pieceElement, pieceState) {
+    pieceElement.classList.remove("white-king", "black-king");
+    if (pieceState.king) {
+      pieceElement.classList.add(`${pieceState.color}-king`);
+    }
   }
 
   submitMove(from, to) {
-    const state = this.syncPositionFromDOM();
+    const state = this.gameState;
     const validation = this.rulesEngine.validateMove(state, { from, to });
     if (!validation.valid) return { ...validation, keepTurn: false };
 
-    document.querySelectorAll(".last-captured-ghost").forEach((ghost) => {
-      ghost.remove();
+    const movingPiece = this.pieceElements[from];
+    if (!movingPiece || this.piecePositions.get(movingPiece) !== from) {
+      throw new Error(`No rendered piece matches source square ${from}`);
+    }
+    const movingColor = state.squares[from].color;
+    const capturedColors = validation.captures.map(
+      (square) => state.squares[square].color
+    );
+    const capturedElements = validation.captures.map((square) => {
+      const piece = this.pieceElements[square];
+      if (!piece || this.piecePositions.get(piece) !== square) {
+        throw new Error(`No rendered piece matches captured square ${square}`);
+      }
+      return piece;
     });
 
     let keepTurn = false;
@@ -276,6 +286,36 @@ class Board {
       revision: state.revision
     });
     this.gameState = GameState.fromJSON(snapshot);
+
+    document.dispatchEvent(
+      new CustomEvent("checkers:move", {
+        detail: { from, to, captures: validation.captures.slice() }
+      })
+    );
+
+    validation.captures.forEach((capturedSquare, index) => {
+      const capturedPiece = capturedElements[index];
+      const capturedColor = capturedColors[index];
+      capturedPiece.classList.remove(`piece-${capturedColor}`);
+      capturedPiece.classList.add(`piece-out-${capturedColor}`);
+      const tray = document.getElementById(
+        movingColor === "white" ? "removedw" : "removedb"
+      );
+      tray.appendChild(capturedPiece);
+      this.pieceElements[capturedSquare] = null;
+      this.piecePositions.set(capturedPiece, null);
+      document.getElementById(capturedSquare).setAttribute("occupied", "false");
+    });
+
+    const sourceSquare = document.getElementById(from);
+    const destinationSquare = document.getElementById(to);
+    destinationSquare.appendChild(movingPiece);
+    sourceSquare.setAttribute("occupied", "false");
+    destinationSquare.setAttribute("occupied", "true");
+    this.pieceElements[from] = null;
+    this.pieceElements[to] = movingPiece;
+    this.piecePositions.set(movingPiece, to);
+    this.updatePieceElement(movingPiece, this.gameState.squares[to]);
     return { ...validation, keepTurn };
   }
 
@@ -300,7 +340,10 @@ class Board {
     this.applyLanguage();
     this.updateSoundToggle();
     this.updateFullscreenToggle();
-    if (this.isPlaying && this.colorPlay === this.playerColor) {
+    if (
+      this.isPlaying &&
+      this.gameState.turn === this.playerColor.slice("piece-".length)
+    ) {
       document.getElementById("messages").textContent =
         this.translate(
           this.playerColor === "piece-white" ? "whiteTurn" : "blackTurn"
@@ -362,16 +405,25 @@ class Board {
     }
     this.ruleset = ruleset;
     this.rulesEngine = new RulesEngine(ruleset);
+    this.gameState = new GameState({
+      ...this.gameState.toJSON(),
+      ruleset
+    });
     localStorage.setItem("ruleset", ruleset);
 
-    if (!this.isPlaying || this.colorPlay !== this.playerColor) {
+    if (
+      !this.isPlaying ||
+      this.gameState.turn !== this.playerColor.slice("piece-".length)
+    ) {
       return;
     }
 
     document.querySelectorAll(".possible, .moving").forEach((square) => {
       square.classList.remove("possible", "moving");
     });
-    const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+    const playerPieces = this.getPieces(
+      this.playerColor.slice("piece-".length)
+    );
     playerPieces.forEach((piece) => {
       piece.classList.remove("highlight");
       piece.movable = true;
@@ -411,22 +463,23 @@ class Board {
   gameControl() {
     /* Method to control the game turns*/
     this.turn += 1;
-    if (this.colorPlay === this.playerColor) {
+    if (this.gameState.turn === this.playerColor.slice("piece-".length)) {
       const message = document.getElementById("messages");
       message.textContent = this.translate(
         this.playerColor === "piece-white" ? "whiteTurn" : "blackTurn"
       );
-      const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+      const computerColor = this.computerColor.slice("piece-".length);
+      const computerPieces = this.getPieces(computerColor);
       computerPieces.forEach((item) => {
         item.movable = false;
         item.addEventListener("click", this.pieceClick);
       });
-      this.promoteToKing(computerPieces);
       setTimeout(() => {
         this.checkWinner();
       }, 1000);
 
-      const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+      const playerColor = this.playerColor.slice("piece-".length);
+      const playerPieces = this.getPieces(playerColor);
       if (!this.checkIfcanTake(playerPieces)) {
         playerPieces.forEach((item) => {
           item.movable = true;
@@ -442,15 +495,16 @@ class Board {
         item.classList.remove("highlight");
       });
 
-      const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
+      const playerColor = this.playerColor.slice("piece-".length);
+      const playerPieces = this.getPieces(playerColor);
       playerPieces.forEach((item) => {
         item.movable = false;
       });
-      this.promoteToKing(playerPieces);
       setTimeout(() => {
         this.checkWinner();
       }, 1000);
-      const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+      const computerColor = this.computerColor.slice("piece-".length);
+      const computerPieces = this.getPieces(computerColor);
       computerPieces.forEach((item) => {
         item.movable = false;
         this.checkpossibleMove(item);
@@ -473,22 +527,35 @@ class Board {
     /* Create the pieces on the board*/
     const blackPieces = [1, 3, 5, 7, 8, 10, 12, 14, 17, 19, 21, 23];
     const whitePieces = [40, 42, 44, 46, 49, 51, 53, 55, 56, 58, 60, 62];
-    // get squares
-    const squares = document.querySelectorAll(".square");
-    // create pieces
-    for (let i = 0; i < 64; i++) {
-      const bPiece = new Piece("black");
-      const wPiece = new Piece("white");
-      if (blackPieces.includes(i)) {
-        squares[i].appendChild(bPiece.get_piece(100 + i));
-        squares[i].setAttribute("occupied", "true");
-      }
-      if (whitePieces.includes(i)) {
-        squares[i].appendChild(wPiece.get_piece(200 + i));
-        squares[i].setAttribute("occupied", "true");
-      }
-    }
-    this.syncPositionFromDOM();
+    const squares = Array(64).fill(null);
+    blackPieces.forEach((square) => {
+      squares[square] = { color: "black", king: false };
+    });
+    whitePieces.forEach((square) => {
+      squares[square] = { color: "white", king: false };
+    });
+    this.gameState = new GameState({
+      squares,
+      turn: "white",
+      ruleset: this.ruleset,
+      revision: 0
+    });
+    this.pieceElements = Array(64).fill(null);
+
+    this.gameState.squares.forEach((pieceState, square) => {
+      const squareElement = document.getElementById(square);
+      squareElement.setAttribute("occupied", String(Boolean(pieceState)));
+      if (!pieceState) return;
+
+      const piece = new Piece(pieceState.color);
+      const element = piece.get_piece(
+        (pieceState.color === "black" ? 100 : 200) + square
+      );
+      this.updatePieceElement(element, pieceState);
+      squareElement.appendChild(element);
+      this.pieceElements[square] = element;
+      this.piecePositions.set(element, square);
+    });
   }
 
   // Method to avoid bug of piece being moved to another square
@@ -546,9 +613,8 @@ class Board {
       board.playSound("move");
       const piece = document.querySelector(".moving");
       const square = document.getElementById(e.target.id);
-      const oldSquare = document.getElementById(piece.parentNode.id);
       const moveResult = board.submitMove(
-        Number(oldSquare.id),
+        board.piecePositions.get(piece),
         Number(square.id)
       );
       if (!moveResult.valid) {
@@ -558,58 +624,15 @@ class Board {
         });
         return false;
       }
-      let keepTurn = moveResult.keepTurn;
-      // move piece
-      square.appendChild(piece);
-      // check if took piece
-      if (board.takeIt.length > 0) {
-        for (let i = 0; i < board.takeIt.length; i++) {
-          let item = board.takeIt[i];
-          const movPiece = item[0];
-          const enemySquareId = item[1];
-          const opositeSquare = document.getElementById(item[2]);
-          if (movPiece == piece && opositeSquare == square) {
-            board.playSound("take");
-            // remove enemy piece
-            const enemySquare = document.getElementById(enemySquareId);
-            const outPiece = enemySquare.firstChild;
-            const capturedColor = outPiece.classList.contains("piece-white")
-              ? "white"
-              : "black";
-            outPiece.classList.remove(`piece-${capturedColor}`);
-            outPiece.classList.add(`piece-out-${capturedColor}`);
-            const captureTray = document.getElementById(
-              piece.classList.contains("piece-white") ? "removedw" : "removedb"
-            );
-            captureTray.appendChild(outPiece);
-            // remove from board
-            enemySquare.innerHTML = "";
-            enemySquare.setAttribute("occupied", "false");
-            // check if can take again
-            board.takeIt = [];
-            board.needTake = [];
-            if (board.checkIfcanTake([piece])) {
-              board.needTake = [];
-              board.takeIt = [];
-              keepTurn = true;
-              break;
-            }
-          }
-        }
+      if (moveResult.capture) {
+        board.playSound("take");
       }
       piece.classList.remove("moving");
-      // remove possible class
       const dragSquares = document.querySelectorAll(".possible");
       dragSquares.forEach((item) => {
         item.classList.remove("possible");
       });
-      // remove occupied from old square
-      oldSquare.setAttribute("occupied", "false");
-      square.setAttribute("occupied", "true");
-      if (!keepTurn) {
-        board.invertPlayerTurn();
-      }
-      this.pieceTaking = null;
+      board.pieceTaking = null;
       board.gameControl();
     }
   }
@@ -621,8 +644,9 @@ class Board {
       return;
     }
 
-    let keepTurn = false;
-    const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+    const computerPieces = this.getPieces(
+      this.computerColor.slice("piece-".length)
+    );
     let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : computerPieces;
     let captureOptions = this.getComputerCaptures(piecesToCheck);
     let captureCount = 0;
@@ -630,7 +654,7 @@ class Board {
     if (captureOptions.length > 0) {
       while (captureOptions.length > 0 && captureCount < 12) {
         this.takeIt = captureOptions;
-        keepTurn = board.takePiece();
+        board.takePiece();
         captureCount++;
         captureOptions = this.getComputerCaptures([this.pieceTaking]);
       }
@@ -638,9 +662,6 @@ class Board {
       board.moveComputerPiece();
     }
     this.pieceTaking = null;
-    if (!keepTurn) {
-      board.invertPlayerTurn();
-    }
     board.gameControl();
   }
 
@@ -654,48 +675,45 @@ class Board {
   }
 
   scoreComputerMove(piece, destination, capturedSquare = null) {
-    const source = piece.parentNode;
-    const capturedPiece = capturedSquare ? capturedSquare.firstChild : null;
-    const wasKing = piece.isKing;
-
-    source.removeChild(piece);
-    destination.appendChild(piece);
-    if (capturedPiece) {
-      capturedSquare.removeChild(capturedPiece);
+    const from = this.piecePositions.get(piece);
+    const pieceState = this.gameState.squares[from];
+    if (!pieceState) {
+      throw new Error(`No game-state piece matches rendered square ${from}`);
     }
-
+    const wasKing = pieceState.king;
     const destinationId = Number(destination.id);
-    const promotes =
-      !wasKing &&
-      (this.computerColor === "piece-white"
-        ? destinationId < 8
-        : destinationId > 55);
-    if (promotes) {
-      piece.isKing = true;
-    }
+    const captures = capturedSquare ? [Number(capturedSquare.id)] : [];
+    const simulation = GameState.fromJSON(this.gameState.toJSON());
+    simulation.applyMove({
+      from,
+      to: destinationId,
+      captures,
+      keepTurn: true,
+      revision: simulation.revision
+    });
+
+    const movedPiece = simulation.squares[destinationId];
+    const promotes = !wasKing && movedPiece.king;
 
     let immediateCaptures = 0;
     let capturesOfMovedPiece = 0;
-    const playerPieces = document.querySelectorAll(`.${this.playerColor}`);
-    playerPieces.forEach((playerPiece) => {
-      this.takeIt = [];
-      this.needTake = [];
-      this.checkpossibleMove(playerPiece);
-      this.takeIt.forEach((capture) => {
-        immediateCaptures++;
-        if (capture[1] == destination.id) {
-          capturesOfMovedPiece++;
-        }
+    const opponentColor = this.playerColor.slice("piece-".length);
+    this.rulesEngine
+      .getMandatoryCaptures(simulation, opponentColor)
+      .forEach((options) => {
+        options.forEach((option) => {
+          immediateCaptures += 1;
+          if (option.captures.includes(destinationId)) {
+            capturesOfMovedPiece += 1;
+          }
+        });
       });
-    });
 
-    this.takeIt = [];
-    this.needTake = [];
-    const mobility = this.checkpossibleMove(piece).length;
-    const row = Math.floor(Number(destination.id) / 8);
+    const mobility = this.rulesEngine.getLegalMoves(simulation, destinationId).length;
+    const row = Math.floor(destinationId / 8);
     const column = Number(destination.id) % 8;
     const centerDistance = Math.abs(column - 3.5) + Math.abs(row - 3.5);
-    const advancement = this.computerColor === "piece-white" ? -row : row;
+    const advancement = movedPiece.color === "white" ? -row : row;
     const score =
       advancement * 2 +
       mobility * 2 -
@@ -703,15 +721,6 @@ class Board {
       (promotes ? 80 : 0) -
       capturesOfMovedPiece * 100 -
       (immediateCaptures - capturesOfMovedPiece) * 10;
-
-    piece.isKing = wasKing;
-    source.appendChild(piece);
-    if (capturedPiece) {
-      capturedSquare.appendChild(capturedPiece);
-    }
-
-    this.takeIt = [];
-    this.needTake = [];
     return score;
   }
 
@@ -720,7 +729,6 @@ class Board {
     /* Method to take a piece */
     let group = null;
     let piece;
-    let enemySquare;
     let oppositeSquare;
     let bestScore = -Infinity;
     const validOptions = board.takeIt.filter((option) => {
@@ -756,26 +764,12 @@ class Board {
     board.playSound("take");
     piece = group[0];
     this.pieceTaking = piece;
-    enemySquare = document.getElementById(group[1]);
     oppositeSquare = document.getElementById(group[2]);
     const moveResult = this.submitMove(
-      Number(piece.parentNode.id),
+      this.piecePositions.get(piece),
       Number(oppositeSquare.id)
     );
     if (!moveResult.valid) return false;
-    const outPiece = enemySquare.firstChild;
-    const playerColor = this.playerColor.slice("piece-".length);
-    outPiece.classList.remove(this.playerColor);
-    outPiece.classList.add(`piece-out-${playerColor}`);
-    const captureTray = document.getElementById(
-      this.computerColor === "piece-white" ? "removedw" : "removedb"
-    );
-    captureTray.appendChild(outPiece);
-    piece.parentNode.removeChild(piece);
-    oppositeSquare.appendChild(piece);
-    enemySquare.innerHTML = "";
-    enemySquare.setAttribute("occupied", "false");
-    oppositeSquare.setAttribute("occupied", "true");
     return moveResult.keepTurn;
   }
 
@@ -785,7 +779,9 @@ class Board {
     let bestMove = null;
     let bestScore = -Infinity;
     const possibleMoves = [];
-    const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
+    const computerPieces = this.getPieces(
+      this.computerColor.slice("piece-".length)
+    );
     computerPieces.forEach((piece) => {
       const pieceMoves = this.checkpossibleMove(piece);
       pieceMoves.forEach((moveId) => {
@@ -818,16 +814,12 @@ class Board {
 
     const piece = bestMove[0];
     const destination = bestMove[1];
-    const source = piece.parentNode;
     const moveResult = board.submitMove(
-      Number(source.id),
+      board.piecePositions.get(piece),
       Number(destination.id)
     );
     if (!moveResult.valid) return false;
     board.playSound("move");
-    destination.appendChild(piece);
-    destination.setAttribute("occupied", "true");
-    source.setAttribute("occupied", "false");
     return true;
   }
 
@@ -861,26 +853,6 @@ class Board {
     }
   }
 
-  // Promote to king
-  promoteToKing(pieces) {
-    /* Change the piece to king if it reaches the end of the board
-    Input (obj): Piece
-    */
-
-    pieces.forEach((item) => {
-      if (item.classList.contains("piece-white") && item.parentNode.id < 8) {
-        item.classList.add("white-king");
-        item.isKing = true;
-      } else if (
-        item.classList.contains("piece-black") &&
-        item.parentNode.id > 55
-      ) {
-        item.classList.add("black-king");
-        item.isKing = true;
-      }
-    });
-  }
-
   updateScore(color) {
     /* Update the score
     Input (str): Color of the piece
@@ -908,20 +880,27 @@ class Board {
     let blackPiecesLeft = 0;
 
     // No pieces left
-    const whitePieces = document.querySelectorAll(".piece-white");
-    const blackPieces = document.querySelectorAll(".piece-black");
-    whitePieces.forEach((item) => {
-      whitePiecesLeft += this.checkpossibleMove(item).length;
-    });
-    blackPieces.forEach((item) => {
-      blackPiecesLeft += this.checkpossibleMove(item).length;
+    const whitePieces = this.gameState.squares.filter(
+      (piece) => piece && piece.color === "white"
+    );
+    const blackPieces = this.gameState.squares.filter(
+      (piece) => piece && piece.color === "black"
+    );
+    this.gameState.squares.forEach((piece, square) => {
+      if (!piece) return;
+      const legalMoves = this.rulesEngine.getLegalMoves(this.gameState, square);
+      if (piece.color === "white") {
+        whitePiecesLeft += legalMoves.length;
+      } else {
+        blackPiecesLeft += legalMoves.length;
+      }
     });
 
-    if (whitePieces.length == 0) {
+    if (whitePieces.length === 0) {
       this.updateScore("black");
       this.showGameOver(this.translate("blackWinsPieces"));
       return -1;
-    } else if (blackPieces.length == 0) {
+    } else if (blackPieces.length === 0) {
       this.updateScore("white");
       this.showGameOver(this.translate("whiteWinsPieces"));
       return -1;
@@ -987,25 +966,17 @@ class Board {
     }
   }
 
-  // invert Player turn
-  invertPlayerTurn() {
-    /* Invert the player turn */
-    const colors = ["piece-white", "piece-black"];
-    if (this.colorPlay == colors[0]) {
-      this.colorPlay = colors[1];
-    } else {
-      this.colorPlay = colors[0];
-    }
-  }
-
   // Method to check possible targets
   checkpossibleMove(pieceToCheck = null) {
     let movPiece =
       pieceToCheck || document.querySelector(".moving");
     if (!movPiece) return [];
 
-    const state = this.syncPositionFromDOM();
-    const from = Number(movPiece.parentNode.id);
+    const state = this.gameState;
+    const from = this.piecePositions.get(movPiece);
+    if (!Number.isInteger(from)) return [];
+    const piece = state.squares[from];
+    if (!piece) return [];
     const captureOptions = this.rulesEngine.getCaptureOptions(state, from);
     if (captureOptions.length > 0) {
       this.needTake.push(movPiece);
@@ -1019,40 +990,10 @@ class Board {
 
     const mandatory = this.rulesEngine.getMandatoryCaptures(
       state,
-      movPiece.classList.contains("piece-white") ? "white" : "black"
+      piece.color
     );
     if (mandatory.size > 0) return [];
     return this.rulesEngine.getSimpleMoves(state, from);
-  }
-
-  // Method to check if the piece can take another piece
-  canTake(enemySquareId, pieceToCheck) {
-    // define corners
-    const corners = [1, 3, 5, 7, 8, 24, 40, 56, 58, 60, 62, 55, 39, 23];
-    // check if the oposite square is occupied
-    let movPiece = document.querySelector(".moving");
-    if (pieceToCheck) {
-      movPiece = pieceToCheck;
-    }
-    // test for different directions
-    const piecePositionId = parseInt(movPiece.parentNode.id);
-    // target piece position
-    if (corners.includes(enemySquareId)) {
-      return false;
-    } else {
-      let relation = enemySquareId - piecePositionId;
-      let opositeSquareId = enemySquareId + relation;
-      const opositeSquare = document.getElementById(opositeSquareId);
-      if (opositeSquare.hasChildNodes()) {
-        return false;
-      } else {
-        // movePiece : piece that need to move
-        this.needTake.push(movPiece);
-        // enemySquare : square with the piece to take
-        this.takeIt.push([movPiece, enemySquareId, opositeSquareId]);
-        return opositeSquareId;
-      }
-    }
   }
 
   // Method to enable drag-to-move on a piece
@@ -1223,7 +1164,6 @@ class Board {
 class Piece {
   constructor(color) {
     this.color = color;
-    this.isKing = false;
     this.piece = document.createElement("div");
     this.piece.className = "piece";
     this.piece.classList.add("piece-" + color);

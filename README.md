@@ -130,7 +130,7 @@ Lighhouse mobile and desktop testing:
 
 - Based on the checkers rules, the player needs to capture as many pieces as possible. The game is not programmed to do that neither to check if the player is taking the best possible move. The game is programmed to force a take.
 
-- The computer is not programmed to take the best possible move. The computer is programmed to take a random piece.
+- The computer uses a shallow move-scoring heuristic on Medium and Hard, and random choices on Easy. It does not search future turns.
 
 - It was reported to crash in Android, but I was not able to reproduce the error.
 

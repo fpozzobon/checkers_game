@@ -24,8 +24,8 @@ Before diving in, read [ARCHITECTURE.md](ARCHITECTURE.md) to see how the code is
 - Keep the `/*jshint esversion: 6 */` header; the code is validated with JSHint.
 - Match the existing style: 2-space indentation, double quotes, semicolons, `camelCase` for methods and variables, `PascalCase` for classes.
 - Add a short doc comment (`/* ... */`) under new methods describing inputs and outputs, as existing methods do.
-- The DOM is the source of truth for board state. If you introduce a separate board model, refactor consistently rather than mixing both.
-- Be careful with `checkpossibleMove` and `canTake`: they mutate `needTake` / `takeIt`.
+- `GameState` is the source of truth for board positions, turns and king status; keep DOM changes as rendering/input only.
+- `RulesEngine` must remain DOM-independent. `checkpossibleMove` adapts its results for the UI and computer move selection.
 
 ### CSS
 - Use `vmin` units with a `max()` pixel floor, so the layout keeps working down to about 250 x 300 px.
@@ -36,7 +36,7 @@ Before diving in, read [ARCHITECTURE.md](ARCHITECTURE.md) to see how the code is
 
 ## Manual test checklist
 
-There is no automated test suite yet. Before opening a pull request, please check:
+Run the core unit tests with `npm test`. Before opening a pull request, also check:
 
 - [ ] Start Game, Reset Game, and the cog / close-menu buttons work
 - [ ] Options: sound and highlight toggles take effect
@@ -45,7 +45,7 @@ There is no automated test suite yet. Before opening a pull request, please chec
 - [ ] Forced capture: only capturing pieces are movable, and highlight follows the option
 - [ ] Multi-jump keeps the turn with the same player
 - [ ] Reaching the far row crowns a king that can move backwards
-- [ ] Win and loss both show an alert, update the Results counters, and reload
+- [ ] Win and loss show the game-over dialog, update the Results counters, and return to the menu
 - [ ] Works on a narrow mobile viewport (use browser dev tools)
 - [ ] No errors in the browser console
 

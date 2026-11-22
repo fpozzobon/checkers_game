@@ -42,7 +42,8 @@ Owns the game state and rules. A single global instance, `board`, is created at 
 
 | State | Purpose |
 |---|---|
-| `colorPlay` | Whose turn it is: `"piece-white"` or `"piece-black"` |
+| `gameState` | Authoritative 64-square position, turn, ruleset and revision |
+| `pieceElements`, `piecePositions` | DOM projection: maps model squares to rendered piece elements |
 | `playerColor`, `computerColor` | The selected human side and the opposite computer side |
 | `needTake` | Pieces that currently have a mandatory capture |
 | `takeIt` | Capture descriptors: `[piece, enemySquareId, landingSquareId]` |
@@ -57,35 +58,33 @@ Key methods:
 |---|---|
 | `constructor` | Builds the 64 squares, initialises `localStorage` scores |
 | `startGame` | Creates pieces, installs `movestart` guard, starts first turn |
-| `gameControl` | Turn dispatcher. Freezes/unfreezes pieces, promotes kings, schedules `checkWinner`, and schedules `computerMove` when it is the computer's turn |
-| `createPieces` | Places 12 pieces per side on the dark squares |
+| `gameControl` | Turn dispatcher. Freezes/unfreezes rendered pieces, schedules `checkWinner`, and schedules `computerMove` when it is the computer's turn |
+| `createPieces` | Creates the starting `GameState` and renders its pieces |
 | `pieceClick` | Selects a movable piece and highlights its target squares |
-| `movePiece` | Executes the human's move, handles capture and multi-capture |
+| `movePiece` | Submits a human move; state application renders the move and handles captures |
 | `computerMove` | Computer's turn: capture if forced, otherwise make a move |
 | `takePiece` / `moveComputerPiece` | The computer's capture and plain-move implementations |
-| `checkpossibleMove` | Core move generator for one piece (see below) |
-| `canTake` | Tests whether an adjacent enemy can be jumped |
+| `checkpossibleMove` | Adapts the rules engine's legal moves to the rendered piece UI |
 | `checkIfcanTake` | Applies the forced-capture rule to a group of pieces |
-| `promoteToKing` | Crowns pieces that reached the far row |
-| `checkWinner` | Win detection (no pieces or no legal moves), then alert + reload |
+| `checkWinner` | Uses `GameState` and the rules engine to detect no pieces or legal moves |
 | `updateScore` | Increments the winner's counter in `localStorage` |
-| `playSound`, `invertPlayerTurn` | Helpers |
+| `playSound`, `updatePieceElement` | Helpers |
 
 ### `Piece`
-Thin wrapper that creates a `<div class="piece piece-{color}">`. `get_piece(id)` assigns the element id and returns it. King status is stored as an expando property on the DOM element (`element.isKing`), and `element.movable` is used the same way.
+Thin wrapper that creates a `<div class="piece piece-{color}">`. `get_piece(id)` assigns the element id and returns it. Color and king classes are rendered from `GameState`; `element.movable` remains UI-only state.
 
 ### `Menu`
 Builds and swaps the in-board menu panel: main menu, color choice, Options, Rules and Results sub-screens, plus the small cog button shown when the menu is hidden. The menu cannot be hidden until a game starts; during a game, clicking outside it closes it. Menu HTML is generated via `innerHTML` template strings and listeners are attached after each render.
 
 ## Data model
 
-The **DOM is the source of truth**. There is no separate in-memory board array.
+`GameState` is the source of truth. It stores 64 `null` or `{ color, king }` entries, the current turn, ruleset and revision. `RulesEngine` reads snapshots and validates moves. The DOM renders accepted state changes and supplies user input; it is not scanned to reconstruct the board.
 
 - Squares are `div.square` with ids `0`–`63` in row-major order (`id = row * 8 + col`), alternating `.white` / `.black`. Only `.black` squares are playable; `.white` has `pointer-events: none`.
 - Square 0 is light, so dark squares are those where `row + col` is odd.
-- A square holds at most one child (a piece). The `occupied` attribute is also maintained.
-- Pieces have ids `100 + startSquare` (black) and `200 + startSquare` (white). These ids do **not** update as pieces move; use `piece.parentNode.id` for the current position.
-- Piece color is read from `classList[1]` (`piece-white` / `piece-black`). Kings get an extra class (`white-king` / `black-king`) appended after, so index 1 stays stable. Reordering classes will break the logic.
+- Each square has an optional rendered piece. `pieceElements` and `piecePositions` map this view to the corresponding model square.
+- Piece ids remain stable after movement and are only DOM identifiers. Rules, turn ownership, promotion, captures and winner detection use `GameState`.
+- The `occupied`, `movable`, color and king classes are renderer/UI details, not game-state inputs.
 
 ### Movement geometry
 With `id = row * 8 + col`:
@@ -95,7 +94,7 @@ With `id = row * 8 + col`:
 | Up-left / up-right | `-9` / `-7` |
 | Down-left / down-right | `+7` / `+9` |
 
-White men move up, black men move down, kings move in all four. Edge squares are handled with hard-coded lists (`leftCorners`, `rightCorners`, `whiteTopCorners`, `blackTopCorners`) to prevent wrap-around.
+White men move up, black men move down, and kings move in all four directions. `RulesEngine` uses row and column bounds to prevent wrap-around.
 
 ## Turn flow
 
@@ -103,31 +102,26 @@ White men move up, black men move down, kings move in all four. Edge squares are
 startGame()
    └─ gameControl()
         ├─ Player's turn
-        │    ├─ freeze computer pieces and promote them; schedule checkWinner
+        │    ├─ freeze computer pieces; schedule model-based checkWinner
         │    ├─ checkIfcanTake(player) → only capturing pieces are movable (+ highlight)
         │    └─ otherwise all player pieces are movable
         │         user clicks piece → pieceClick → target squares get .possible
         │         user clicks square → movePiece
-        │              ├─ capture? remove enemy, move it to the tray
-        │              ├─ can capture again? keep the turn
-        │              └─ invertPlayerTurn(); gameControl()
+        │              ├─ validate and apply command to GameState
+        │              ├─ render the accepted position and capture tray
+        │              └─ keep the turn for a continued capture, otherwise switch
         └─ Computer's turn
-             ├─ freeze player pieces and promote them; schedule checkWinner
+             ├─ freeze player pieces; schedule model-based checkWinner
              └─ setTimeout(computerMove, 1.2–3.2 s)
                   ├─ forced capture → takePiece()
-                  └─ else → moveComputerPiece() (choose a legal move)
-                  invertPlayerTurn(); gameControl()
+                  └─ otherwise choose a legal move with model-based scoring
+                       └─ submit AI command through the same GameState path
 ```
 
 White always moves first, so choosing black gives the computer the opening move.
 
 ### How `checkpossibleMove` works
-1. Resolve the piece (argument, or the one with class `.moving`).
-2. Build candidate target ids from direction offsets, trimming edge cases.
-3. For each candidate: drop it if blocked by a friendly piece; if blocked by an enemy, call `canTake` to see whether the square behind is empty.
-4. **Return value**: if any capture exists, return only the landing squares of captures; otherwise return plain move squares; return `false` on invalid input.
-
-Be aware that `canTake` has **side effects**: it pushes into `board.needTake` and `board.takeIt`. This is how forced-capture detection works, but it means calling `checkpossibleMove` "just to look" mutates state (see [KNOWN_ISSUES.md](KNOWN_ISSUES.md)).
+It resolves the rendered piece to its model square, asks `RulesEngine` for capture options or legal moves, then adapts those results to the UI's `.possible` markers and computer capture descriptors. Board occupancy and move geometry are read from `GameState`, not the DOM.
 
 ## Persistence
 
@@ -145,10 +139,10 @@ Settings (sound, highlight) and the game state are not persisted. A finished or 
 - 8x8 board, 12 pieces per side, dark squares only
 - Men move one square diagonally forward
 - Captures are mandatory, including multi-jumps
-- Kings move one square in any direction (no "flying kings")
+- Kings move diagonally in all directions; the selected ruleset controls whether they can fly across empty squares
 - Win by capturing everything or leaving the opponent without moves
 
-Not implemented: choosing the maximum capture sequence, draw detection (the in-game Rules text mentions a 30-move rule), and any computer strategy beyond random choice.
+Not implemented: choosing the maximum capture sequence or draw detection (the in-game Rules text mentions a 30-move rule). The computer uses a shallow move-scoring heuristic at higher difficulties and random choices at Easy; it does not search future turns.
 
 ## Styling notes
 
