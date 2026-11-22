@@ -171,6 +171,7 @@ class Board {
     this.piecePositions = new WeakMap();
     this.playerColor = "piece-white";
     this.computerColor = "piece-black";
+    this.game.classList.add("player-white");
     this.whiteKing = false;
     this.blackKing = false;
     this.needTake = []; // save pieces that need to take
@@ -397,6 +398,8 @@ class Board {
     }
     this.playerColor = `piece-${color}`;
     this.computerColor = color === "white" ? "piece-black" : "piece-white";
+    this.game.classList.remove("player-white", "player-black");
+    this.game.classList.add(`player-${color}`);
   }
 
   setRuleset(ruleset) {

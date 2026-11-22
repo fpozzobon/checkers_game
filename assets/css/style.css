@@ -165,10 +165,15 @@ body {
   height: max(17px, 7.5vmin);
   box-shadow: 0.8vmin 0.8vmin 0.3vmin rgb(20, 11, 7);
   z-index: 1;
-  cursor: grab;
+  cursor: default;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+#game.player-white .piece-white,
+#game.player-black .piece-black {
+  cursor: grab;
 }
 
 .piece.dragging {
