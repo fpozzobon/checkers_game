@@ -1,7 +1,9 @@
 //Board class that create and command the game
 /*jshint esversion: 6 */
+import { GameState } from "./core/game-state.js";
+import { RulesEngine } from "./core/rules-engine.js";
+
 const translations = {
-  en: {
     title: "Checkers Game",
     description:
       "Play checkers with the computer for free, no sign-in required, easy to use, classic Checkers game!",
@@ -148,6 +150,13 @@ class Board {
       savedRuleset === "british" || savedRuleset === "flying"
         ? savedRuleset
         : "flying";
+    this.rulesEngine = new RulesEngine(this.ruleset);
+    this.gameState = new GameState({
+      squares: Array(64).fill(null),
+      turn: "white",
+      ruleset: this.ruleset,
+      revision: 0
+    });
     const savedDifficulty = localStorage.getItem("difficulty");
     this.difficulty =
       savedDifficulty === "easy" ||
@@ -214,6 +223,55 @@ class Board {
       newDiv.setAttribute("occupied", "false");
       this.game.appendChild(newDiv);
     }
+  }
+
+  syncPositionFromDOM() {
+    const squares = Array(64).fill(null);
+    document.querySelectorAll(".square").forEach((square) => {
+      const piece = square.firstChild;
+      if (!piece || !piece.classList.contains("piece")) return;
+      squares[Number(square.id)] = {
+        color: piece.classList.contains("piece-white") ? "white" : "black",
+        king: Boolean(piece.isKing)
+      };
+    });
+    this.gameState = new GameState({
+      squares,
+      turn: this.colorPlay === "piece-white" ? "white" : "black",
+      ruleset: this.ruleset,
+      revision: this.gameState.revision
+    });
+    return this.gameState;
+  }
+
+  submitMove(from, to) {
+    const state = this.syncPositionFromDOM();
+    const validation = this.rulesEngine.validateMove(state, { from, to });
+    if (!validation.valid) return { ...validation, keepTurn: false };
+
+    let keepTurn = false;
+    if (validation.capture) {
+      const provisional = GameState.fromJSON(state.toJSON());
+      provisional.applyMove({
+        from,
+        to,
+        captures: validation.captures,
+        keepTurn: true,
+        revision: state.revision
+      });
+      keepTurn =
+        this.rulesEngine.getCaptureOptions(provisional, to).length > 0;
+    }
+
+    const snapshot = this.gameState.applyMove({
+      from,
+      to,
+      captures: validation.captures,
+      keepTurn,
+      revision: state.revision
+    });
+    this.gameState = GameState.fromJSON(snapshot);
+    return { ...validation, keepTurn };
   }
 
   translate(key) {
@@ -298,6 +356,7 @@ class Board {
       throw new RangeError(`Unsupported ruleset: ${ruleset}`);
     }
     this.ruleset = ruleset;
+    this.rulesEngine = new RulesEngine(ruleset);
     localStorage.setItem("ruleset", ruleset);
 
     if (!this.isPlaying || this.colorPlay !== this.playerColor) {
@@ -424,6 +483,7 @@ class Board {
         squares[i].setAttribute("occupied", "true");
       }
     }
+    this.syncPositionFromDOM();
   }
 
   // Method to avoid bug of piece being moved to another square
@@ -482,6 +542,18 @@ class Board {
       const piece = document.querySelector(".moving");
       const square = document.getElementById(e.target.id);
       const oldSquare = document.getElementById(piece.parentNode.id);
+      const moveResult = board.submitMove(
+        Number(oldSquare.id),
+        Number(square.id)
+      );
+      if (!moveResult.valid) {
+        piece.classList.remove("moving");
+        document.querySelectorAll(".possible").forEach((item) => {
+          item.classList.remove("possible");
+        });
+        return false;
+      }
+      let keepTurn = moveResult.keepTurn;
       // move piece
       square.appendChild(piece);
       // check if took piece
@@ -514,8 +586,7 @@ class Board {
             if (board.checkIfcanTake([piece])) {
               board.needTake = [];
               board.takeIt = [];
-              // player can take again
-              board.invertPlayerTurn();
+              keepTurn = true;
               break;
             }
           }
@@ -530,7 +601,9 @@ class Board {
       // remove occupied from old square
       oldSquare.setAttribute("occupied", "false");
       square.setAttribute("occupied", "true");
-      board.invertPlayerTurn();
+      if (!keepTurn) {
+        board.invertPlayerTurn();
+      }
       this.pieceTaking = null;
       board.gameControl();
     }
@@ -543,6 +616,7 @@ class Board {
       return;
     }
 
+    let keepTurn = false;
     const computerPieces = document.querySelectorAll(`.${this.computerColor}`);
     let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : computerPieces;
     let captureOptions = this.getComputerCaptures(piecesToCheck);
@@ -551,7 +625,7 @@ class Board {
     if (captureOptions.length > 0) {
       while (captureOptions.length > 0 && captureCount < 12) {
         this.takeIt = captureOptions;
-        board.takePiece();
+        keepTurn = board.takePiece();
         captureCount++;
         captureOptions = this.getComputerCaptures([this.pieceTaking]);
       }
@@ -559,7 +633,9 @@ class Board {
       board.moveComputerPiece();
     }
     this.pieceTaking = null;
-    board.invertPlayerTurn();
+    if (!keepTurn) {
+      board.invertPlayerTurn();
+    }
     board.gameControl();
   }
 
@@ -677,6 +753,11 @@ class Board {
     this.pieceTaking = piece;
     enemySquare = document.getElementById(group[1]);
     oppositeSquare = document.getElementById(group[2]);
+    const moveResult = this.submitMove(
+      Number(piece.parentNode.id),
+      Number(oppositeSquare.id)
+    );
+    if (!moveResult.valid) return false;
     const outPiece = enemySquare.firstChild;
     const playerColor = this.playerColor.slice("piece-".length);
     outPiece.classList.remove(this.playerColor);
@@ -690,7 +771,7 @@ class Board {
     enemySquare.innerHTML = "";
     enemySquare.setAttribute("occupied", "false");
     oppositeSquare.setAttribute("occupied", "true");
-    return true;
+    return moveResult.keepTurn;
   }
 
   // Method to move a piece
@@ -733,6 +814,11 @@ class Board {
     const piece = bestMove[0];
     const destination = bestMove[1];
     const source = piece.parentNode;
+    const moveResult = board.submitMove(
+      Number(source.id),
+      Number(destination.id)
+    );
+    if (!moveResult.valid) return false;
     board.playSound("move");
     destination.appendChild(piece);
     destination.setAttribute("occupied", "true");
@@ -909,179 +995,29 @@ class Board {
 
   // Method to check possible targets
   checkpossibleMove(pieceToCheck = null) {
-    /* This method will check the possible moves for the piece that is being moved
-    and will return an array with the possible squares
+    let movPiece =
+      pieceToCheck || document.querySelector(".moving");
+    if (!movPiece) return [];
 
-    Inpunt: pieceToCheck = can be a piece or null, when null,
-    the method will check the piece that is being moved
-
-    Output: returns an array of possible squares or array of squares to take a piece
-    or an empty array if there is no possible move.
-    */
-
-    let taking = [];
-    // left corners
-    const leftCorners = [8, 24, 40, 56];
-    // right corners
-    const rightCorners = [7, 23, 39, 55];
-    // white top corners
-    const whiteTopCorners = [1, 3, 5, 7];
-    // black top corners
-    const blackTopCorners = [56, 58, 60, 62];
-    // get piece
-    let movPiece = document.querySelector(".moving");
-    if (pieceToCheck) {
-      movPiece = pieceToCheck;
-    }
-    if (!movPiece) {
-      return false;
-    }
-    // get piece color
-    const pieceColor = movPiece.classList[1];
-    // get piece id
-    const pieceId = parseInt(movPiece.parentNode.id);
-    // get piece position
-    let possibleMoves = [];
-    if (movPiece.isKing && this.ruleset === "flying") {
-      const directions = [
-        [-1, -1],
-        [-1, 1],
-        [1, -1],
-        [1, 1]
-      ];
-      const row = Math.floor(pieceId / 8);
-      const column = pieceId % 8;
-      const flyingMoves = [];
-      const flyingCaptures = [];
-
-      directions.forEach(([rowStep, columnStep]) => {
-        let nextRow = row + rowStep;
-        let nextColumn = column + columnStep;
-        let enemySquareId = null;
-        while (
-          nextRow >= 0 &&
-          nextRow < 8 &&
-          nextColumn >= 0 &&
-          nextColumn < 8
-        ) {
-          const squareId = nextRow * 8 + nextColumn;
-          const square = document.getElementById(squareId);
-          if (!square.hasChildNodes()) {
-            if (enemySquareId === null) {
-              flyingMoves.push(squareId);
-            } else {
-              flyingCaptures.push([movPiece, enemySquareId, squareId]);
-            }
-          } else if (
-            enemySquareId === null &&
-            !square.firstChild.classList.contains(pieceColor)
-          ) {
-            enemySquareId = squareId;
-          } else {
-            break;
-          }
-          nextRow += rowStep;
-          nextColumn += columnStep;
-        }
+    const state = this.syncPositionFromDOM();
+    const from = Number(movPiece.parentNode.id);
+    const captureOptions = this.rulesEngine.getCaptureOptions(state, from);
+    if (captureOptions.length > 0) {
+      this.needTake.push(movPiece);
+      captureOptions.forEach((option) => {
+        option.captures.forEach((captured) => {
+          this.takeIt.push([movPiece, captured, option.to]);
+        });
       });
-
-      if (flyingCaptures.length > 0) {
-        this.needTake.push(movPiece);
-        flyingCaptures.forEach((capture) => this.takeIt.push(capture));
-        return flyingCaptures.map((capture) => capture[2]);
-      }
-      return flyingMoves;
+      return captureOptions.map((option) => option.to);
     }
 
-    // check if is a isKing
-    if (movPiece.isKing) {
-      possibleMoves.push(pieceId - 9);
-      possibleMoves.push(pieceId - 7);
-      possibleMoves.push(pieceId + 7);
-      possibleMoves.push(pieceId + 9);
-      // check for borders for King
-      if (leftCorners.includes(pieceId)) {
-        possibleMoves = possibleMoves.filter((item) => item != pieceId - 9);
-        possibleMoves = possibleMoves.filter((item) => item != pieceId + 7);
-      }
-      if (rightCorners.includes(pieceId)) {
-        possibleMoves = possibleMoves.filter((item) => item != pieceId - 7);
-        possibleMoves = possibleMoves.filter((item) => item != pieceId + 9);
-      }
-      if (whiteTopCorners.includes(pieceId)) {
-        possibleMoves = possibleMoves.filter((item) => item != pieceId - 9);
-        possibleMoves = possibleMoves.filter((item) => item != pieceId - 7);
-      }
-      if (blackTopCorners.includes(pieceId)) {
-        possibleMoves = possibleMoves.filter((item) => item != pieceId + 7);
-        possibleMoves = possibleMoves.filter((item) => item != pieceId + 9);
-      }
-    } else {
-      switch (pieceColor) {
-        case "piece-white":
-          possibleMoves.push(pieceId - 9);
-          possibleMoves.push(pieceId - 7);
-          if (leftCorners.includes(pieceId)) {
-            possibleMoves.shift();
-          }
-          if (rightCorners.includes(pieceId)) {
-            possibleMoves.pop();
-          }
-          break;
-        case "piece-black":
-          possibleMoves.push(pieceId + 9);
-          possibleMoves.push(pieceId + 7);
-          if (leftCorners.includes(pieceId)) {
-            possibleMoves.pop();
-          }
-          if (rightCorners.includes(pieceId)) {
-            possibleMoves.shift();
-          }
-          break;
-      }
-    }
-    // check for pieces on the way
-    if (possibleMoves.length > 0 && possibleMoves != null) {
-      for (let i = 0; i < possibleMoves.length + 1; i++) {
-        const targetSquare = document.getElementById(possibleMoves[i]);
-        try {
-          if (targetSquare != null && targetSquare.hasChildNodes()) {
-            // square has piece of same color
-            if (targetSquare.firstChild.classList[1] == pieceColor) {
-              // remove move
-              possibleMoves.splice(i, 1);
-              i--;
-              // if square has piece of different color
-            } else if (targetSquare.firstChild.classList[1] != pieceColor) {
-              // check if the next square is occupied
-              let targetSquare = this.canTake(possibleMoves[i], movPiece);
-              if (targetSquare) {
-                // send the square with the piece to take and the square to move to
-                taking.push(targetSquare);
-              }
-              possibleMoves.splice(i, 1);
-              i--;
-            }
-          }
-        } catch (err) {
-          continue;
-        }
-        // There is no position to go! (out of the board)
-        if (possibleMoves[i] < 0 || possibleMoves[i] > 63) {
-          possibleMoves.splice(i, 1);
-          i--;
-        }
-      }
-    }
-    // check if there is nan
-    if (possibleMoves.includes(NaN)) {
-      return false;
-    }
-    // check if there is a taking
-    if (taking.length > 0) {
-      return taking;
-    }
-    return possibleMoves;
+    const mandatory = this.rulesEngine.getMandatoryCaptures(
+      state,
+      movPiece.classList.contains("piece-white") ? "white" : "black"
+    );
+    if (mandatory.size > 0) return [];
+    return this.rulesEngine.getSimpleMoves(state, from);
   }
 
   // Method to check if the piece can take another piece

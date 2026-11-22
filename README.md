@@ -96,6 +96,12 @@ Once in the Game, the user can go back to the menu using the small cog icon in t
 
 ## Testing
 
+The core state and rules modules have dependency-free Node unit tests:
+
+```bash
+npm test
+```
+
 The website was tested on a desktop computer and a mobile phone.
 Also, W3C and Jigsaw validation was used to validate the website HTML and CSS.
 

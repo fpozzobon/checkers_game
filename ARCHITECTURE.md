@@ -11,7 +11,10 @@ The game is a static, dependency-free web app: plain HTML, CSS and vanilla JavaS
 ├── index.html              # Page shell: containers + script/style includes
 ├── assets/
 │   ├── css/style.css       # Board, pieces, menus, switches, captured-piece trays
-│   ├── js/script.js        # All game logic (Board, Piece, Menu classes)
+│   ├── js/script.js        # DOM controller and computer opponent
+│   ├── js/core/
+│   │   ├── game-state.js   # Serializable, DOM-independent position model
+│   │   └── rules-engine.js # Pure move and capture validation
 │   ├── audio/              # move.mp3, capture.mp3, menu.mp3
 │   └── images/             # Wood textures, piece sprites, README screenshots
 ├── LICENSE                 # MIT
