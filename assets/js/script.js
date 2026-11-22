@@ -250,6 +250,10 @@ class Board {
     const validation = this.rulesEngine.validateMove(state, { from, to });
     if (!validation.valid) return { ...validation, keepTurn: false };
 
+    document.querySelectorAll(".last-captured-ghost").forEach((ghost) => {
+      ghost.remove();
+    });
+
     let keepTurn = false;
     if (validation.capture) {
       const provisional = GameState.fromJSON(state.toJSON());
