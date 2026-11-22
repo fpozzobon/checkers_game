@@ -29,6 +29,9 @@ const translations = {
     options: "Options",
     soundOn: "Turn sound on",
     soundOff: "Turn sound off",
+    enterFullscreen: "Enter fullscreen",
+    exitFullscreen: "Exit fullscreen",
+    fullscreenError: "Unable to change fullscreen mode.",
     rules: "Rules",
     results: "Results",
     sound: "Sound On/Off",
@@ -87,6 +90,9 @@ const translations = {
     options: "Options",
     soundOn: "Activer le son",
     soundOff: "Désactiver le son",
+    enterFullscreen: "Passer en plein écran",
+    exitFullscreen: "Quitter le plein écran",
+    fullscreenError: "Impossible de changer le mode plein écran.",
     rules: "Règles",
     results: "Résultats",
     sound: "Son activé/désactivé",
@@ -174,6 +180,14 @@ class Board {
       this.updateSoundToggle();
       this.playSound("menu");
     });
+    this.fullscreenToggle = document.getElementById("fullscreen-toggle");
+    this.updateFullscreenToggle();
+    this.fullscreenToggle.addEventListener("click", () => {
+      this.toggleFullscreen();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      this.updateFullscreenToggle();
+    });
     this.menuIsOpen = true;
     this.isPlaying = false;
     this.gameOver = false;
@@ -222,6 +236,7 @@ class Board {
     localStorage.setItem("language", language);
     this.applyLanguage();
     this.updateSoundToggle();
+    this.updateFullscreenToggle();
     if (this.isPlaying && this.colorPlay === this.playerColor) {
       document.getElementById("messages").textContent =
         this.translate(
@@ -237,6 +252,37 @@ class Board {
       this.translate(this.optionSound ? "soundOff" : "soundOn")
     );
     this.soundToggle.setAttribute("aria-pressed", String(this.optionSound));
+  }
+
+  updateFullscreenToggle() {
+    const isFullscreen = Boolean(document.fullscreenElement);
+    this.fullscreenToggle.textContent = isFullscreen ? "\u25a3" : "\u26f6";
+    const label = this.translate(
+      isFullscreen ? "exitFullscreen" : "enterFullscreen"
+    );
+    this.fullscreenToggle.setAttribute("aria-label", label);
+    this.fullscreenToggle.setAttribute("title", label);
+  }
+
+  async toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (error) {
+      console.error("Could not change fullscreen mode:", error);
+      const messages = document.getElementById("messages");
+      const previousMessage = messages.textContent;
+      const errorMessage = this.translate("fullscreenError");
+      messages.textContent = errorMessage;
+      setTimeout(() => {
+        if (messages.textContent === errorMessage) {
+          messages.textContent = previousMessage;
+        }
+      }, 3000);
+    }
   }
 
   setPlayerColor(color) {
@@ -1533,7 +1579,8 @@ document.addEventListener("click", (event) => {
     !openMenu ||
     openMenu.contains(event.target) ||
     event.target.closest(".menu-hidden") ||
-    event.target.closest("#sound-toggle")
+    event.target.closest("#sound-toggle") ||
+    event.target.closest("#fullscreen-toggle")
   ) {
     return;
   }

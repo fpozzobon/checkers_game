@@ -8,6 +8,24 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 }
+
+:root:fullscreen {
+  background-color: #333;
+}
+
+:root:fullscreen body {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+}
+
+:root:fullscreen #center {
+  width: 100vw;
+  height: 100vh;
+  padding-top: 1vh;
+  box-sizing: border-box;
+}
+
 #center {
   display: block;
   margin: auto;
@@ -15,9 +33,9 @@ body {
   padding-top: 5vh;
 }
 
-#sound-toggle {
+#sound-toggle,
+#fullscreen-toggle {
   position: fixed;
-  top: 5vh;
   right: 2vmin;
   z-index: 20;
   display: grid;
@@ -34,12 +52,23 @@ body {
   transition: background-color 120ms ease, transform 120ms ease;
 }
 
-#sound-toggle:hover {
+#sound-toggle {
+  top: 5vh;
+}
+
+#fullscreen-toggle {
+  top: calc(5vh + 52px);
+  font-size: 24px;
+}
+
+#sound-toggle:hover,
+#fullscreen-toggle:hover {
   transform: scale(1.08);
   background: rgb(155, 91, 46);
 }
 
-#sound-toggle:focus-visible {
+#sound-toggle:focus-visible,
+#fullscreen-toggle:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 3px;
 }
