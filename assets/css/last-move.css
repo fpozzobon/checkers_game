@@ -1,0 +1,14 @@
+/* A subtle yellow tint marks the source and destination of the most recent move. */
+.square.last-move {
+  position: relative;
+}
+
+.square.last-move::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 225, 0, 0.32);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  z-index: 2;
+}
