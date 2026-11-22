@@ -7,6 +7,14 @@ const translations = {
       "Play checkers with the computer for free, no sign-in required, easy to use, classic Checkers game!",
     whiteTurn: "White's turn",
     blackTurn: "Black's turn",
+    menu: "Menu",
+    playMode: "Choose a game mode",
+    vsComputer: "Against computer",
+    vsLocal: "Against local player (coming soon)",
+    vsOnline: "Against online player (coming soon)",
+    computerSettings: "Computer game setup",
+    playerColor: "Play as",
+    back: "Back",
     chooseColor: "Choose your color",
     white: "White",
     black: "Black",
@@ -19,6 +27,8 @@ const translations = {
     startGame: "Start Game!",
     resetGame: "Reset Game!",
     options: "Options",
+    soundOn: "Turn sound on",
+    soundOff: "Turn sound off",
     rules: "Rules",
     results: "Results",
     sound: "Sound On/Off",
@@ -55,6 +65,14 @@ const translations = {
       "Jouez aux dames gratuitement contre l'ordinateur, sans inscription. Un jeu de dames classique, simple à utiliser !",
     whiteTurn: "Aux Blancs de jouer",
     blackTurn: "Aux Noirs de jouer",
+    menu: "Menu",
+    playMode: "Choisissez un mode de jeu",
+    vsComputer: "Contre l'ordinateur",
+    vsLocal: "Contre un joueur local (bientôt)",
+    vsOnline: "Contre un joueur en ligne (bientôt)",
+    computerSettings: "Paramètres contre l'ordinateur",
+    playerColor: "Jouer avec",
+    back: "Retour",
     chooseColor: "Choisissez votre couleur",
     white: "Blancs",
     black: "Noirs",
@@ -67,6 +85,8 @@ const translations = {
     startGame: "Commencer",
     resetGame: "Recommencer",
     options: "Options",
+    soundOn: "Activer le son",
+    soundOff: "Désactiver le son",
     rules: "Règles",
     results: "Résultats",
     sound: "Son activé/désactivé",
@@ -145,7 +165,15 @@ class Board {
     this.menu = new Audio("assets/audio/menu.mp3");
     this.turn = 0;
     this.optionHighlight = true;
-    this.optionSound = true;
+    this.optionSound = localStorage.getItem("soundEnabled") === "true";
+    this.soundToggle = document.getElementById("sound-toggle");
+    this.updateSoundToggle();
+    this.soundToggle.addEventListener("click", () => {
+      this.optionSound = !this.optionSound;
+      localStorage.setItem("soundEnabled", String(this.optionSound));
+      this.updateSoundToggle();
+      this.playSound("menu");
+    });
     this.menuIsOpen = true;
     this.isPlaying = false;
     this.gameOver = false;
@@ -193,12 +221,22 @@ class Board {
     this.language = language;
     localStorage.setItem("language", language);
     this.applyLanguage();
+    this.updateSoundToggle();
     if (this.isPlaying && this.colorPlay === this.playerColor) {
       document.getElementById("messages").textContent =
         this.translate(
           this.playerColor === "piece-white" ? "whiteTurn" : "blackTurn"
         );
     }
+  }
+
+  updateSoundToggle() {
+    this.soundToggle.textContent = this.optionSound ? "\u{1f50a}" : "\u{1f507}";
+    this.soundToggle.setAttribute(
+      "aria-label",
+      this.translate(this.optionSound ? "soundOff" : "soundOn")
+    );
+    this.soundToggle.setAttribute("aria-pressed", String(this.optionSound));
   }
 
   setPlayerColor(color) {
@@ -1171,39 +1209,59 @@ class Menu {
     menu.classList.add("menu");
     if (board.isPlaying) {
       menu.classList.add("is-playing");
-    }
-    menu.innerHTML = `<div id="close-menu"><i class="far fa-times-circle"></i></div>`;
-    if (board.isPlaying) {
-      menu.innerHTML += `<div class="menu-item" id="new-game">${board.translate(
-        "resetGame"
-      )}</div>`;
+      menu.innerHTML = `
+        <div id="close-menu"><i class="far fa-times-circle"></i></div>
+        <div class="menu-title">${board.translate("menu")}</div>
+        <button class="menu-item menu-action" id="rules" type="button">${board.translate(
+          "rules"
+        )}</button>
+        <button class="menu-item menu-action" id="results" type="button">${board.translate(
+          "results"
+        )}</button>`;
     } else {
-      menu.innerHTML += `<div class="menu-item" id="new-game">${board.translate(
-        "startGame"
-      )}</div>`;
+      menu.classList.add("menu-main");
+      menu.innerHTML = `
+        <div class="menu-title">${board.translate("playMode")}</div>
+        <button class="menu-item menu-action" id="vs-computer" type="button">${board.translate(
+          "vsComputer"
+        )}</button>
+        <button class="menu-item menu-action" id="vs-local" type="button" disabled>${board.translate(
+          "vsLocal"
+        )}</button>
+        <button class="menu-item menu-action" id="vs-online" type="button" disabled>${board.translate(
+          "vsOnline"
+        )}</button>
+        <div class="menu-divider"></div>
+        <button class="menu-item menu-action" id="options" type="button">${board.translate(
+          "options"
+        )}</button>
+        <button class="menu-item menu-action" id="rules" type="button">${board.translate(
+          "rules"
+        )}</button>
+        <button class="menu-item menu-action" id="results" type="button">${board.translate(
+          "results"
+        )}</button>`;
     }
-    menu.innerHTML += `
-        <div class="menu-item" id="options">${board.translate("options")}</div>
-        <div class="menu-item" id="rules">${board.translate("rules")}</div>
-        <div class="menu-item" id="results">${board.translate("results")}</div>`;
     board.game.appendChild(menu);
 
-    document.getElementById("close-menu").addEventListener("click", () => {
-      this.closeMenu();
-    });
-    document.getElementById("new-game").addEventListener("click", () => {
-      board.playSound("menu");
-      if (board.isPlaying == true) {
-        this.hiddenMenu();
-        location.reload();
-      } else {
-        this.chooseColor();
-      }
-    });
-    document.getElementById("options").addEventListener("click", () => {
-      board.playSound("menu");
-      this.options();
-    });
+    const closeButton = document.getElementById("close-menu");
+    if (closeButton) {
+      closeButton.addEventListener("click", () => this.closeMenu());
+    }
+    const computerButton = document.getElementById("vs-computer");
+    if (computerButton) {
+      computerButton.addEventListener("click", () => {
+        board.playSound("menu");
+        this.setupComputerGame();
+      });
+    }
+    const optionsButton = document.getElementById("options");
+    if (optionsButton) {
+      optionsButton.addEventListener("click", () => {
+        board.playSound("menu");
+        this.options();
+      });
+    }
     document.getElementById("rules").addEventListener("click", () => {
       board.playSound("menu");
       this.rules();
@@ -1214,39 +1272,81 @@ class Menu {
     });
   }
 
-  chooseColor() {
+  setupComputerGame() {
     const menu = document.getElementById("menu");
+    menu.classList.remove("menu-main");
+    menu.classList.add("menu-setup");
     menu.innerHTML = `
-      <div id="close-menu"><i class="far fa-times-circle"></i></div>
-      <div class="menu-item color-prompt">${board.translate("chooseColor")}</div>
-      <div class="menu-item" id="play-white">${board.translate("white")}</div>
-      <div class="menu-item" id="play-black">${board.translate("black")}</div>
-      <div class="submenu rules-back" id="color-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
+      <div class="menu-title">${board.translate("computerSettings")}</div>
+      <div class="setup-control" id="player-color-control">
+        <label class="submenu" for="player-color-select">${board.translate(
+          "playerColor"
+        )}</label>
+        <select id="player-color-select">
+          <option value="white" ${
+            board.playerColor === "piece-white" ? "selected" : ""
+          }>${board.translate("white")}</option>
+          <option value="black" ${
+            board.playerColor === "piece-black" ? "selected" : ""
+          }>${board.translate("black")}</option>
+        </select>
+      </div>
+      <div class="setup-control" id="difficulty-control">
+        <label class="submenu" for="difficulty-select">${board.translate(
+          "difficulty"
+        )}</label>
+        <select id="difficulty-select">
+          <option value="easy" ${
+            board.difficulty === "easy" ? "selected" : ""
+          }>${board.translate("easy")}</option>
+          <option value="medium" ${
+            board.difficulty === "medium" ? "selected" : ""
+          }>${board.translate("medium")}</option>
+          <option value="hard" ${
+            board.difficulty === "hard" ? "selected" : ""
+          }>${board.translate("hard")}</option>
+        </select>
+      </div>
+      <div class="setup-control" id="ruleset-control">
+        <label class="submenu" for="ruleset-select">${board.translate(
+          "ruleset"
+        )}</label>
+        <select id="ruleset-select">
+          <option value="flying" ${
+            board.ruleset === "flying" ? "selected" : ""
+          }>${board.translate("flyingKings")}</option>
+          <option value="british" ${
+            board.ruleset === "british" ? "selected" : ""
+          }>${board.translate("britishDraughts")}</option>
+        </select>
+      </div>
+      <button class="menu-item menu-action start-button" id="start-computer" type="button">${board.translate(
+        "startGame"
+      )}</button>
+      <button class="submenu setup-back" id="setup-back" type="button">${board.translate(
+        "back"
+      )}</button>`;
 
-    document.getElementById("close-menu").addEventListener("click", () => {
-      this.closeMenu();
+    document.getElementById("difficulty-select").addEventListener("change", (event) => {
+      board.setDifficulty(event.target.value);
     });
-
-    document.getElementById("color-back").addEventListener("click", () => {
-      board.playSound("menu");
-      this.clearMenu();
-      this.createMenu();
+    document.getElementById("ruleset-select").addEventListener("change", (event) => {
+      board.setRuleset(event.target.value);
     });
-
-    const startGame = (color) => {
+    document.getElementById("start-computer").addEventListener("click", () => {
       board.playSound("menu");
-      board.setPlayerColor(color);
+      board.setPlayerColor(
+        document.getElementById("player-color-select").value
+      );
       board.startGame();
       board.isPlaying = true;
       board.menuIsOpen = false;
       this.hiddenMenu();
-    };
-
-    document.getElementById("play-white").addEventListener("click", () => {
-      startGame("white");
     });
-    document.getElementById("play-black").addEventListener("click", () => {
-      startGame("black");
+    document.getElementById("setup-back").addEventListener("click", () => {
+      board.playSound("menu");
+      this.clearMenu();
+      this.createMenu();
     });
   }
 
@@ -1287,131 +1387,43 @@ class Menu {
     const menu = document.getElementById("menu");
     menu.classList.add("menu-options");
     menu.innerHTML = `
-    <div id="close-menu"><i class="far fa-times-circle"></i></div>
-    <div class="menu-item" id="options">${board.translate("options")}</div>
-    `;
-    if (board.optionSound) {
-      menu.innerHTML += `<div class="submenu" id="sound"><span class="space">${board.translate(
-        "sound"
-      )}</span>
-                        <label class="switch" id="sound-switch">
-                        <input type="checkbox" checked>
-                        <span class="slider round"></span>
-                        </label></div>`;
-    } else {
-      menu.innerHTML += `<div class="submenu" id="sound"><span class="space">${board.translate(
-        "sound"
-      )}</span>
-                        <label class="switch" id="sound-switch">
-                        <input type="checkbox">
-                        <span class="slider round"></span>
-                        </label></div>`;
-    }
-    if (board.optionHighlight) {
-      menu.innerHTML += `<div class="submenu" id="highlight"><span class="space-s">${board.translate(
-        "forcedHighlight"
-      )}</span>
-                          <label class="switch" id="highlight-switch">
-                          <input type="checkbox" checked>
-                          <span class="slider round"></span>
-                          </label></div>`;
-    } else {
-      menu.innerHTML += `<div class="submenu" id="highlight"><span class="space-s">${board.translate(
-        "forcedHighlight"
-      )}</span>
-                          <label class="switch" id="highlight-switch">
-                          <input type="checkbox">
-                          <span class="slider round"></span>
-                          </label></div>`;
-    }
-    menu.innerHTML += `<div id="language-control">
-                         <label class="submenu" for="language-select">${board.translate(
-                           "language"
-                         )}</label>
-                         <select id="language-select">
-                           <option value="en" ${
-                             board.language === "en" ? "selected" : ""
-                           }>English</option>
-                           <option value="fr" ${
-                             board.language === "fr" ? "selected" : ""
-                           }>Français</option>
-                         </select>
-                       </div>`;
-    menu.innerHTML += `<div id="ruleset-control">
-                           <label class="submenu" for="ruleset-select">${board.translate(
-                             "ruleset"
-                           )}</label>
-                           <select id="ruleset-select">
-                             <option value="flying" ${
-                               board.ruleset === "flying" ? "selected" : ""
-                             }>${board.translate("flyingKings")}</option>
-                             <option value="british" ${
-                               board.ruleset === "british" ? "selected" : ""
-                             }>${board.translate("britishDraughts")}</option>
-                           </select>
-                         </div>`;
-    menu.innerHTML += `<div id="difficulty-control">
-                           <label class="submenu" for="difficulty-select">${board.translate(
-                             "difficulty"
-                           )}</label>
-                           <select id="difficulty-select">
-                             <option value="easy" ${
-                               board.difficulty === "easy" ? "selected" : ""
-                             }>${board.translate("easy")}</option>
-                             <option value="medium" ${
-                               board.difficulty === "medium" ? "selected" : ""
-                             }>${board.translate("medium")}</option>
-                             <option value="hard" ${
-                               board.difficulty === "hard" ? "selected" : ""
-                             }>${board.translate("hard")}</option>
-                           </select>
-                         </div>`;
-    menu.innerHTML += `<div class="submenu" id="back"><i class="fa fa-backward" aria-hidden="true"></i>
-                       </div>`;
+      <div id="close-menu"><i class="far fa-times-circle"></i></div>
+      <div class="menu-title">${board.translate("options")}</div>
+      <div class="submenu" id="highlight">
+        <span>${board.translate("forcedHighlight")}</span>
+        <label class="switch" id="highlight-switch">
+          <input type="checkbox" ${board.optionHighlight ? "checked" : ""}>
+          <span class="slider round"></span>
+        </label>
+      </div>
+      <div id="language-control">
+        <label class="submenu" for="language-select">${board.translate(
+          "language"
+        )}</label>
+        <select id="language-select">
+          <option value="en" ${
+            board.language === "en" ? "selected" : ""
+          }>English</option>
+          <option value="fr" ${
+            board.language === "fr" ? "selected" : ""
+          }>Français</option>
+        </select>
+      </div>
+      <button class="submenu setup-back" id="back" type="button">${board.translate(
+        "back"
+      )}</button>`;
 
-    //check if sound switch is off
-    const switchSound = document.getElementById("sound-switch");
-    switchSound.addEventListener("change", () => {
-      if (board.optionSound) {
-        board.optionSound = false;
-      } else {
-        board.optionSound = true;
-      }
+    document.getElementById("highlight-switch").addEventListener("change", () => {
+      board.optionHighlight = !board.optionHighlight;
       board.playSound("menu");
     });
-
-    const switchHighlight = document.getElementById("highlight-switch");
-    switchHighlight.addEventListener("change", () => {
-      board.playSound("menu");
-      if (board.optionHighlight) {
-        board.optionHighlight = false;
-      } else {
-        board.optionHighlight = true;
-      }
-    });
-
-    document.getElementById("language-select").addEventListener("change", (e) => {
-      board.setLanguage(e.target.value);
+    document.getElementById("language-select").addEventListener("change", (event) => {
+      board.setLanguage(event.target.value);
       this.options();
     });
-
-    document.getElementById("ruleset-select").addEventListener("change", (e) => {
-      board.setRuleset(e.target.value);
-      this.options();
-    });
-
-    document
-      .getElementById("difficulty-select")
-      .addEventListener("change", (e) => {
-        board.setDifficulty(e.target.value);
-        board.playSound("menu");
-      });
-
-    // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
       this.closeMenu();
     });
-
     document.getElementById("back").addEventListener("click", () => {
       board.playSound("menu");
       this.clearMenu();
@@ -1511,7 +1523,8 @@ document.addEventListener("click", (event) => {
   if (
     !openMenu ||
     openMenu.contains(event.target) ||
-    event.target.closest(".menu-hidden")
+    event.target.closest(".menu-hidden") ||
+    event.target.closest("#sound-toggle")
   ) {
     return;
   }
