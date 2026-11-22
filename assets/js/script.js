@@ -4,6 +4,7 @@ import { GameState } from "./core/game-state.js";
 import { RulesEngine } from "./core/rules-engine.js";
 
 const translations = {
+  en: {
     title: "Checkers Game",
     description:
       "Play checkers with the computer for free, no sign-in required, easy to use, classic Checkers game!",
