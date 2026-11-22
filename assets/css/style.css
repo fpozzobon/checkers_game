@@ -1,9 +1,7 @@
 body {
   touch-action: none;
   background-color: #333;
-  margin-top: 0;
-  margin-left: 0;
-  margin-right: 0;
+  margin: 0;
   z-index: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -15,6 +13,7 @@ body {
 
 :root:fullscreen body {
   height: 100vh;
+  height: 100dvh;
   margin: 0;
   overflow: hidden;
 }
@@ -22,15 +21,25 @@ body {
 :root:fullscreen #center {
   width: 100vw;
   height: 100vh;
-  padding-top: 1vh;
+  height: 100dvh;
+  padding: 0;
   box-sizing: border-box;
 }
 
 #center {
-  display: block;
-  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
   text-align: center;
-  padding-top: 5vh;
+}
+
+#board-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #sound-toggle,
@@ -90,6 +99,7 @@ body {
 
 /* entire game */
 #game {
+  position: relative;
   display: inline-grid;
   grid-template-columns: auto auto auto auto auto auto auto auto;
   border: 2vmin solid;
@@ -102,12 +112,17 @@ body {
 
 /* messages */
 #messages {
+  position: absolute;
+  top: calc(100% + 2vh);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  box-sizing: border-box;
   display: block;
   text-align: center;
   font-family: inherit;
-  padding-right: 75vmin;
-  margin-left: 7vmin;
-  padding-top: 2vh;
+  padding: 0 2vmin;
+  margin: 0;
   font-size: 3vmin;
   color: rgb(156, 92, 45);
   z-index: 2;
@@ -307,32 +322,36 @@ body {
 
 .menu {
   margin: 0;
-  margin-left: 20vmin;
-  margin-top: 12.5vmin;
   width: max(120px, 39.6vmin);
-  height: max(150px, 55vmin);
+  height: auto;
+  min-height: max(150px, 55vmin);
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
   border: 2px solid rgb(255, 255, 255);
   box-shadow: 0.8vmin 0.8vmin 1.2vmin black;
   background-color: rgb(155, 91, 46);
   opacity: 0.9;
   position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  overflow-y: auto;
   border-radius: 5vmin;
   z-index: 2;
 }
 
 .menu.menu-main,
 .menu.menu-setup {
-  left: 50%;
-  top: 8px;
   width: min(390px, calc(100vw - 32px));
   height: auto;
   min-height: 0;
   max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
   margin: 0;
   padding: 12px 20px;
   box-sizing: border-box;
   overflow-y: auto;
-  transform: translateX(-50%);
 }
 
 #menu:not(.is-playing) #close-menu {
