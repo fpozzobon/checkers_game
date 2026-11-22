@@ -25,7 +25,7 @@ const translations = {
     gameOver: "Game over",
     ok: "OK",
     startGame: "Start Game!",
-    resetGame: "Reset Game!",
+    restartGame: "Restart",
     options: "Options",
     soundOn: "Turn sound on",
     soundOff: "Turn sound off",
@@ -83,7 +83,7 @@ const translations = {
     gameOver: "Fin de la partie",
     ok: "OK",
     startGame: "Commencer",
-    resetGame: "Recommencer",
+    restartGame: "Recommencer",
     options: "Options",
     soundOn: "Activer le son",
     soundOff: "Désactiver le son",
@@ -1212,6 +1212,9 @@ class Menu {
       menu.innerHTML = `
         <div id="close-menu"><i class="far fa-times-circle"></i></div>
         <div class="menu-title">${board.translate("menu")}</div>
+        <button class="menu-item menu-action" id="restart-game" type="button">${board.translate(
+          "restartGame"
+        )}</button>
         <button class="menu-item menu-action" id="rules" type="button">${board.translate(
           "rules"
         )}</button>
@@ -1232,21 +1235,27 @@ class Menu {
           "vsOnline"
         )}</button>
         <div class="menu-divider"></div>
-        <button class="menu-item menu-action" id="options" type="button">${board.translate(
-          "options"
-        )}</button>
-        <button class="menu-item menu-action" id="rules" type="button">${board.translate(
-          "rules"
-        )}</button>
-        <button class="menu-item menu-action" id="results" type="button">${board.translate(
-          "results"
-        )}</button>`;
+        <div class="menu-footer">
+          <button class="menu-footer-button" id="options" type="button">${board.translate(
+            "options"
+          )}</button>
+          <button class="menu-footer-button" id="rules" type="button">${board.translate(
+            "rules"
+          )}</button>
+          <button class="menu-footer-button" id="results" type="button">${board.translate(
+            "results"
+          )}</button>
+        </div>`;
     }
     board.game.appendChild(menu);
 
     const closeButton = document.getElementById("close-menu");
     if (closeButton) {
       closeButton.addEventListener("click", () => this.closeMenu());
+    }
+    const restartButton = document.getElementById("restart-game");
+    if (restartButton) {
+      restartButton.addEventListener("click", () => location.reload());
     }
     const computerButton = document.getElementById("vs-computer");
     if (computerButton) {

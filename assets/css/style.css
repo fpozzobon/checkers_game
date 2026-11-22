@@ -5,6 +5,8 @@ body {
   margin-left: 0;
   margin-right: 0;
   z-index: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
 }
 #center {
   display: block;
@@ -58,7 +60,7 @@ body {
 #messages {
   display: block;
   text-align: center;
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-family: inherit;
   padding-right: 75vmin;
   margin-left: 7vmin;
   padding-top: 2vh;
@@ -152,7 +154,7 @@ body {
 
 .game-over-card h2 {
   margin: 0 0 14px;
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-family: inherit;
   font-size: clamp(26px, 5vmin, 38px);
   font-weight: normal;
   text-shadow: 2px 3px 4px rgba(0, 0, 0, 0.45);
@@ -325,7 +327,7 @@ body {
 .menu-item {
   margin: 0;
   cursor: pointer;
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-family: inherit;
   /* letter-spacing: 0.2rem; */
   margin-top: 2vmin;
   font-size: max(10px, 5vmin);
@@ -359,7 +361,7 @@ body {
 .menu-title {
   margin: 0 0 8px;
   color: #fff;
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-family: inherit;
   font-size: clamp(22px, 4vmin, 30px);
   text-align: center;
   text-shadow: 0.4vmin 0.4vmin 0.7vmin black;
@@ -369,6 +371,47 @@ body {
   height: 1px;
   margin: 6px 0;
   background: rgba(255, 255, 255, 0.35);
+}
+
+.menu-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.menu-footer-button,
+.menu-footer #options,
+.menu-footer #rules,
+.menu-footer #results {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: 600 clamp(12px, 2.8vmin, 15px) / 1.2 system-ui, sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.menu-footer-button:hover,
+.menu-footer #options:hover,
+.menu-footer #rules:hover,
+.menu-footer #results:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.menu-footer-button:focus-visible,
+.menu-footer #options:focus-visible,
+.menu-footer #rules:focus-visible,
+.menu-footer #results:focus-visible {
+  outline: 2px solid #fff5e3;
+  outline-offset: 2px;
 }
 
 .menu-main .menu-item,
@@ -382,15 +425,78 @@ body {
   font-size: clamp(16px, 4vmin, 22px);
 }
 
+.menu-main #vs-computer {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border: 1px solid #fff5e3;
+  border-radius: 12px;
+  background: #fff5e3;
+  box-shadow: 0 4px 0 #c6a575, 0 7px 14px rgba(0, 0, 0, 0.24);
+  color: #3d281b;
+  font-size: clamp(17px, 3.8vmin, 21px);
+  font-weight: 700;
+  text-align: left;
+  text-shadow: none;
+}
+
+.menu-main #vs-computer::after {
+  content: "\203A";
+  float: right;
+  color: #713b1e;
+  font-size: 1.5em;
+  line-height: 0.8;
+}
+
+.menu-main #vs-computer:hover {
+  transform: translateY(-1px);
+  background: #fffaf0;
+  box-shadow: 0 5px 0 #c6a575, 0 9px 16px rgba(0, 0, 0, 0.28);
+}
+
+.menu-main #vs-local:disabled,
+.menu-main #vs-online:disabled {
+  margin-top: 8px;
+  padding: 11px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(25, 20, 17, 0.18);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: clamp(13px, 3.2vmin, 16px);
+  text-align: left;
+}
+
 .start-button {
   margin-top: 18px;
-  border-radius: 8px;
-  background: #f6e5c7;
-  color: #542d18;
+  padding: 12px 16px;
+  border: 1px solid #fff5e3;
+  border-radius: 10px;
+  background: #fff5e3;
+  box-shadow: 0 4px 0 #c6a575, 0 6px 12px rgba(0, 0, 0, 0.25);
+  color: #3d281b;
+  font-family: system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-shadow: none;
+  transition: background-color 120ms ease, box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
 .start-button:hover {
-  background: #fff5e3;
+  transform: translateY(-1px);
+  background: #fffaf0;
+  box-shadow: 0 5px 0 #c6a575, 0 8px 14px rgba(0, 0, 0, 0.28);
+}
+
+.start-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #c6a575;
+}
+
+.start-button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
 }
 
 .setup-back {
@@ -444,7 +550,7 @@ body {
 
 .submenu {
   position: relative;
-  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-family: inherit;
   text-shadow: 0.8vmin 0.8vmin 1.2vmin black;
   font-size: max(6px, 3.5vmin);
   color: #ffffff;
@@ -461,9 +567,7 @@ body {
   margin-top: max(15px, 5vmin);
 }
 
-#language-control,
-#ruleset-control,
-#difficulty-control {
+#language-control {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -475,13 +579,69 @@ body {
 #ruleset-select,
 #difficulty-select,
 #player-color-select {
-  max-width: 22vmin;
-  padding: 0.3vmin;
-  border: 1px solid rgb(255, 255, 255);
-  border-radius: 0.5vmin;
-  background-color: rgb(155, 91, 46);
-  color: #ffffff;
-  font-size: max(10px, 2.5vmin);
+  min-height: 42px;
+  padding: 9px 36px 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  appearance: none;
+  background-color: #713b1e;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #f6e5c7 50%),
+    linear-gradient(135deg, #f6e5c7 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  color: #fff;
+  font: 500 15px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+#language-select {
+  max-width: min(220px, 50vw);
+}
+
+.menu-setup .setup-control {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.menu-setup .setup-control select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  font-size: clamp(14px, 2vmin, 16px);
+}
+
+#language-select:hover,
+#ruleset-select:hover,
+#difficulty-select:hover,
+#player-color-select:hover {
+  border-color: #f6e5c7;
+  background-color: #844b27;
+}
+
+#language-select:focus-visible,
+#ruleset-select:focus-visible,
+#difficulty-select:focus-visible,
+#player-color-select:focus-visible {
+  outline: 3px solid #f6e5c7;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(246, 229, 199, 0.18);
+}
+
+#language-select option,
+#ruleset-select option,
+#difficulty-select option,
+#player-color-select option {
+  background: #fffaf0;
+  color: #3d281b;
 }
 
 #back {
@@ -584,7 +744,7 @@ input:checked + .slider:before {
 /* rules paragraph normal */
 p {
   color: white;
-  font-family: "Arial";
+  font-family: inherit;
   font-size: max(2.4vmin, 15px);
   text-align: left;
   margin-left: 10px;
