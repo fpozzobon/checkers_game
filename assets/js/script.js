@@ -1067,7 +1067,21 @@ class Board {
       }, 100);
 
       const target = document.elementFromPoint(event.clientX, event.clientY);
-      const square = target ? target.closest(".square") : null;
+      let square = target ? target.closest(".square") : null;
+      if (square && !square.classList.contains("possible")) {
+        const capture = board.takeIt
+          .filter(
+            (item) =>
+              item[0] === piece &&
+              item[1] === Number(square.id)
+          )
+          .sort((first, second) =>
+            Math.abs(first[2] - first[1]) - Math.abs(second[2] - second[1])
+          )[0];
+        if (capture) {
+          square = document.getElementById(capture[2]);
+        }
+      }
       if (square && square.classList.contains("possible")) {
         board.movePiece({ target: square });
       }
