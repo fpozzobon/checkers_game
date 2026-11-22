@@ -17,6 +17,9 @@ Before diving in, read [ARCHITECTURE.md](ARCHITECTURE.md) to see how the code is
 
 ## Project conventions
 
+### Versioning
+- Increment the version displayed in `index.html` by `0.01` for each change (for example, `v0.10` to `v0.11`).
+
 ### JavaScript
 - Keep the `/*jshint esversion: 6 */` header; the code is validated with JSHint.
 - Match the existing style: 2-space indentation, double quotes, semicolons, `camelCase` for methods and variables, `PascalCase` for classes.

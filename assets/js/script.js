@@ -477,7 +477,7 @@ class Board {
   movePiece(e) {
     /* Method to move the piece to the square*/
 
-    if (e.target.classList[2] == "possible") {
+    if (e.target.classList.contains("possible")) {
       board.playSound("move");
       const piece = document.querySelector(".moving");
       const square = document.getElementById(e.target.id);
