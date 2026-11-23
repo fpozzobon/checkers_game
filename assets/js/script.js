@@ -1,12 +1,12 @@
 //Board class that create and command the game
 /*jshint esversion: 6 */
-import { GameState } from "./core/game-state.js?v=0.24";
+import { GameState } from "./core/game-state.js";
 import {
   RulesEngine,
   getBoardSize,
   getSquareCount,
   RULESETS
-} from "./core/rules-engine.js?v=0.24";
+} from "./core/rules-engine.js";
 
 const translations = {
   en: {
@@ -65,7 +65,7 @@ const translations = {
       "A piece that reaches the last row becomes a king. Kings move one square diagonally forward or backward and capture by jumping an adjacent piece.",
     endOfGame: "End of game:",
     endOfGameText:
-      "A player wins by capturing all opposing pieces or leaving the opponent with no legal moves.",
+      "A player wins by capturing all opposing pieces or leaving the opponent with no legal moves. A draw occurs if neither side can force a win, or after 30 moves by kings without a capture.",
     player: "Player",
     computer: "Computer",
     resetScore: "Reset Score"
@@ -126,7 +126,7 @@ const translations = {
       "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Elle se déplace d'une case en diagonale vers l'avant ou l'arrière et prend en sautant par-dessus un pion adjacent.",
     endOfGame: "Fin de partie :",
     endOfGameText:
-      "Un joueur gagne en prenant tous les pions adverses ou en empêchant l'adversaire de jouer.",
+      "Un joueur gagne en prenant tous les pions adverses ou en empêchant l'adversaire de jouer. La partie est nulle si aucun camp ne peut forcer la victoire, ou après 30 déplacements de dames sans prise.",
     player: "Joueur",
     computer: "Ordinateur",
     resetScore: "Réinitialiser les scores"
@@ -143,36 +143,15 @@ function getPreferredLanguage() {
     : "en";
 }
 
-const storage = {
-  get(key, fallback = null) {
-    try {
-      const value = window.localStorage.getItem(key);
-      return value === null ? fallback : value;
-    } catch (error) {
-      console.warn(`Could not read localStorage key "${key}":`, error);
-      return fallback;
-    }
-  },
-  set(key, value) {
-    try {
-      window.localStorage.setItem(key, String(value));
-      return true;
-    } catch (error) {
-      console.warn(`Could not write localStorage key "${key}":`, error);
-      return false;
-    }
-  }
-};
-
 class Board {
   // Method to create the board
   constructor() {
-    const savedLanguage = storage.get("language");
+    const savedLanguage = localStorage.getItem("language");
     this.language =
       savedLanguage === "en" || savedLanguage === "fr"
         ? savedLanguage
         : getPreferredLanguage();
-    const savedRuleset = storage.get("ruleset");
+    const savedRuleset = localStorage.getItem("ruleset");
     this.ruleset =
       savedRuleset === "british" || savedRuleset === "international"
         ? savedRuleset
@@ -184,7 +163,7 @@ class Board {
       ruleset: this.ruleset,
       revision: 0
     });
-    const savedDifficulty = storage.get("difficulty");
+    const savedDifficulty = localStorage.getItem("difficulty");
     this.difficulty =
       savedDifficulty === "easy" ||
       savedDifficulty === "medium" ||
@@ -209,12 +188,12 @@ class Board {
     this.menu = new Audio("assets/audio/menu.mp3");
     this.turn = 0;
     this.optionHighlight = true;
-    this.optionSound = storage.get("soundEnabled") === "true";
+    this.optionSound = localStorage.getItem("soundEnabled") === "true";
     this.soundToggle = document.getElementById("sound-toggle");
     this.updateSoundToggle();
     this.soundToggle.addEventListener("click", () => {
       this.optionSound = !this.optionSound;
-      storage.set("soundEnabled", this.optionSound);
+      localStorage.setItem("soundEnabled", String(this.optionSound));
       this.updateSoundToggle();
       this.playSound("menu");
     });
@@ -229,14 +208,13 @@ class Board {
     this.menuIsOpen = true;
     this.isPlaying = false;
     this.gameOver = false;
-    this.timers = new Set();
 
     // prepare for score saving
-    if (storage.get("whiteScore") == null) {
-      storage.set("whiteScore", 0);
+    if (localStorage.getItem("whiteScore") == null) {
+      localStorage.setItem("whiteScore", "0");
     }
-    if (storage.get("blackScore") == null) {
-      storage.set("blackScore", 0);
+    if (localStorage.getItem("blackScore") == null) {
+      localStorage.setItem("blackScore", "0");
     }
 
     // create squares
@@ -287,9 +265,10 @@ class Board {
 
     const movingPiece = this.pieceElements[from];
     if (!movingPiece || this.piecePositions.get(movingPiece) !== from) {
-      return { valid: false, error: `No rendered piece matches source square ${from}`, keepTurn: false };
+      throw new Error(`No rendered piece matches source square ${from}`);
     }
     const movingColor = state.squares[from].color;
+
     let keepTurn = false;
     if (validation.capture) {
       const provisional = GameState.fromJSON(state.toJSON());
@@ -328,6 +307,19 @@ class Board {
     });
     this.gameState = GameState.fromJSON(snapshot);
 
+    document.dispatchEvent(
+      new CustomEvent("checkers:move", {
+        detail: {
+          from,
+          to,
+          captures: validation.captures.slice(),
+          pendingCaptures: this.gameState.pendingCaptures.slice(),
+          mover: movingColor,
+          turnCompleted: !keepTurn
+        }
+      })
+    );
+
     capturedSquaresToRemove.forEach((capturedSquare, index) => {
       const capturedPiece = capturedElements[index];
       const capturedColor = capturedColors[index];
@@ -351,19 +343,11 @@ class Board {
     this.pieceElements[to] = movingPiece;
     this.piecePositions.set(movingPiece, to);
     this.updatePieceElement(movingPiece, this.gameState.squares[to]);
-    document.dispatchEvent(
-      new CustomEvent("checkers:move", {
-        detail: {
-          from,
-          to,
-          captures: validation.captures.slice(),
-          capturedSquares: capturedSquaresToRemove.slice(),
-          pendingCaptures: this.gameState.pendingCaptures.slice(),
-          capturedColors,
-          capturedPieces: capturedElements.map((piece) => piece.cloneNode(true))
-        }
-      })
-    );
+    if (validation.capture) {
+      this.pieceTaking = keepTurn ? movingPiece : null;
+    } else {
+      this.pieceTaking = null;
+    }
     return { ...validation, keepTurn };
   }
 
@@ -384,7 +368,7 @@ class Board {
       throw new RangeError(`Unsupported language: ${language}`);
     }
     this.language = language;
-    storage.set("language", language);
+    localStorage.setItem("language", language);
     this.applyLanguage();
     this.updateSoundToggle();
     this.updateFullscreenToggle();
@@ -461,7 +445,14 @@ class Board {
       ruleset,
       revision: 0
     });
-    storage.set("ruleset", ruleset);
+    this.pieceElements = Array(getSquareCount(ruleset)).fill(null);
+    this.buildBoard();
+    localStorage.setItem("ruleset", ruleset);
+    if (this.isPlaying) {
+      this.createPieces();
+      this.gameControl();
+      return;
+    }
 
     if (
       !this.isPlaying ||
@@ -499,7 +490,7 @@ class Board {
       throw new RangeError(`Unsupported difficulty: ${difficulty}`);
     }
     this.difficulty = difficulty;
-    storage.set("difficulty", difficulty);
+    localStorage.setItem("difficulty", difficulty);
   }
 
   // Method to start the game
@@ -927,9 +918,13 @@ class Board {
 
     const scoreKey =
       `piece-${color}` === this.playerColor ? "whiteScore" : "blackScore";
-    const savedScore = storage.get(scoreKey, "0");
-    const score = (Number.parseInt(savedScore, 10) || 0) + 1;
-    storage.set(scoreKey, score);
+    let score = localStorage.getItem(scoreKey);
+    if (score == null) {
+      score = 0;
+    } else {
+      score = parseInt(score) + 1;
+      localStorage.setItem(scoreKey, String(score));
+    }
   }
 
   // check winner
@@ -1017,15 +1012,15 @@ class Board {
   playSound(soundType) {
     /* Play sound */
     if (this.optionSound) {
-      const audio =
-        soundType == "move" ? this.moveSound :
-        soundType == "take" ? this.takeSound :
-        soundType == "menu" ? this.menu :
-        null;
-      if (!audio) return;
-      Promise.resolve(audio.play()).catch((error) => {
-        console.debug("Audio playback was blocked:", error);
-      });
+      if (soundType == "move") {
+        this.moveSound.play();
+      } else if (soundType == "take") {
+        this.takeSound.play();
+      } else if (soundType == "menu") {
+        this.menu.play();
+      } else if (soundType == "notify") {
+        this.notify.play();
+      }
     }
   }
 
@@ -1254,7 +1249,7 @@ class Menu {
     if (board.isPlaying) {
       menu.classList.add("is-playing");
       menu.innerHTML = `
-        <button id="close-menu" type="button" aria-label="${board.translate("back")}"><span aria-hidden="true">&times;</span></button>
+        <div id="close-menu"><i class="far fa-times-circle"></i></div>
         <div class="menu-title">${board.translate("menu")}</div>
         <button class="menu-item menu-action" id="restart-game" type="button">${board.translate(
           "restartGame"
@@ -1443,7 +1438,7 @@ class Menu {
     const menu = document.getElementById("menu");
     menu.classList.add("menu-options");
     menu.innerHTML = `
-      <button id="close-menu" type="button" aria-label="${board.translate("back")}"><span aria-hidden="true">&times;</span></button>
+      <div id="close-menu"><i class="far fa-times-circle"></i></div>
       <div class="menu-title">${board.translate("options")}</div>
       <div class="submenu" id="highlight">
         <span>${board.translate("forcedHighlight")}</span>
@@ -1491,7 +1486,7 @@ class Menu {
     const menu = document.getElementById("menu");
     menu.classList.add("menu-rules");
     menu.innerHTML = `
-    <button id="close-menu" type="button" aria-label="${board.translate("back")}"><span aria-hidden="true">&times;</span></button>
+    <div id="close-menu"><i class="far fa-times-circle"></i></div>
     <div class="menu-item new-page" id="options">${board.translate("rules")}</div>
     <p class="text-g">${board.translate("simpleMove")}</p>
     <p>${board.translate("simpleMoveText")}</p>
@@ -1503,7 +1498,7 @@ class Menu {
     )}</p>
     <p class="text-g">${board.translate("endOfGame")}</p>
     <p>${board.translate("endOfGameText")}</p>
-    <button class="submenu" id="rules-back" type="button" aria-label="${board.translate("back")}"><span aria-hidden="true">&#9664;</span></button>`;
+    <div class="submenu" id="rules-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
 
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
@@ -1522,21 +1517,21 @@ class Menu {
     const menu = document.getElementById("menu");
     menu.classList.add("menu");
     menu.innerHTML = `
-    <button id="close-menu" type="button" aria-label="${board.translate("back")}"><span aria-hidden="true">&times;</span></button>
+    <div id="close-menu"><i class="far fa-times-circle"></i></div>
     <div class="menu-item new-page" id="results">${board.translate("results")}</div>`;
     // add scores
-    const plyerScore = storage.get("whiteScore", "0");
-    const computerScore = storage.get("blackScore", "0");
+    let plyerScore = localStorage.getItem("whiteScore");
+    let computerScore = localStorage.getItem("blackScore");
     menu.innerHTML += `<p class="submenu results-menu" id="player-score">${board.translate(
       "player"
     )}  ${plyerScore}</p>`;
     menu.innerHTML += `<p class="submenu results-menu" id="computer-score">${board.translate(
       "computer"
     )}  ${computerScore}</p>`;
-    menu.innerHTML += `<button class="submenu results-menu" id="reset-score" type="button">${board.translate(
+    menu.innerHTML += `<div class="submenu results-menu" id="reset-score">${board.translate(
       "resetScore"
-    )}</button>`;
-    menu.innerHTML += `<button class="submenu results-menu" id="rules-back" type="button" aria-label="${board.translate("back")}"><span aria-hidden="true">&#9664;</span></button>`;
+    )}</div>`;
+    menu.innerHTML += `<div class="submenu results-menu" id="rules-back"><i class="fa fa-backward" aria-hidden="true"></i></div>`;
     // add event listeners
     document.getElementById("close-menu").addEventListener("click", () => {
       this.closeMenu();
@@ -1550,8 +1545,8 @@ class Menu {
 
     document.getElementById("reset-score").addEventListener("click", () => {
       board.playSound("menu");
-      storage.set("whiteScore", 0);
-      storage.set("blackScore", 0);
+      localStorage.setItem("whiteScore", 0);
+      localStorage.setItem("blackScore", 0);
       document.getElementById("player-score").textContent = `${board.translate(
         "player"
       )} 0`;
