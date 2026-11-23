@@ -1,6 +1,7 @@
 // Render move history from accepted game-state commands.
 document.addEventListener("checkers:move", (event) => {
-  const { from, to, captures } = event.detail;
+  const { from, to, captures, pendingCaptures = [] } = event.detail;
+  const pendingCaptureSet = new Set(pendingCaptures);
   document.querySelectorAll(".square.last-move").forEach((square) => {
     square.classList.remove("last-move");
   });
@@ -14,6 +15,7 @@ document.addEventListener("checkers:move", (event) => {
   destinationSquare.classList.add("last-move");
 
   captures.forEach((capturedSquareId) => {
+    if (pendingCaptureSet.has(capturedSquareId)) return;
     const capturedSquare = document.getElementById(capturedSquareId);
     const piece = capturedSquare.querySelector(".piece");
     if (!piece) {

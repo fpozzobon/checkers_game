@@ -131,7 +131,7 @@ Shows the number of games won by the player and by the computer, with a button t
 
 - British: 8x8 board with 12 pieces per side. International: 10x10 board with 20 pieces per side.
 - Move by **click** (select a piece, then a highlighted square) or by **dragging** (pointer events, so it works with mouse and touch).
-- **Captures are mandatory.** After a capture, if the same piece can capture again, the turn continues.
+- **Captures are mandatory.** A multi-capture is played one jump at a time with the same piece. International captures must use the longest available sequence; captured pieces remain as blockers and are removed when the sequence ends. The computer also shows each jump before continuing.
 - A piece reaching the last row becomes a king.
 - The last move is highlighted, and the pieces captured by it are shown as faint "ghosts" until the next move.
 - Captured pieces are collected in trays beside the board.
@@ -199,7 +199,7 @@ User-visible behaviour that differs from what players, or the in-game rules text
 
 - **No draw detection.** The rules text promises a draw "after 30 moves by kings without a capture" and when "neither side can force a win", but `checkWinner` only detects "no pieces" and "no legal moves". Two kings can shuffle forever, and the results screen has no draw counter. *Either implement it or remove the sentence from both translations.*
 - **Draw detection is incomplete.** No draw counter or forced-draw detection is implemented.
-- **Multi-capture presentation.** The UI removes all pieces in a validated International capture sequence when the move is submitted.
+- International multi-captures are performed one jump at a time. Captured pieces stay on the board as blockers until the sequence finishes, then are removed together as required by the rules.
 
 **Game**
 
@@ -220,7 +220,7 @@ Ordered roughly by risk. "Where" points to the relevant code.
 | 2 | **Uncaught `throw` inside timers**: `submitMove` and `scoreComputerMove` throw when the DOM and state disagree. They run from `setTimeout` callbacks, so one inconsistency freezes the game silently. | `submitMove`, `scoreComputerMove`, `computerMove` | Catch at the `computerMove` boundary, log, and recover or show a message. |
 | 3 | **Two sources of truth**: `GameState` plus `pieceElements`, `piecePositions` (WeakMap), expando properties on DOM nodes (`piece.movable`, `piece.suppressClick`), and the `needTake` / `takeIt` arrays. They must be kept in sync by hand. | `Board` | Render the DOM from `GameState` in one `render()` function; derive "movable" and capture lists from the `RulesEngine` on demand. |
 | 4 | **Rules text and code disagree** (draw rule, see above). | `translations`, `checkWinner` | Implement or remove. |
-| 5 | **UI layer has no tests**, and `script.js` is one ~1000-line file mixing i18n data, board rendering, AI, drag handling and menus. | `script.js` | Split into modules (`i18n.js`, `ai.js`, `board-view.js`, `menu.js`); move the AI to a pure function over `GameState` so it can be unit tested. |
+| 5 | **UI coverage is limited to a Playwright smoke flow**, and `script.js` is one ~1000-line file mixing i18n data, board rendering, AI, drag handling and menus. | `script.js` | Split into modules (`i18n.js`, `ai.js`, `board-view.js`, `menu.js`); move the AI to a pure function over `GameState` so it can be unit tested. |
 
 ### Medium
 
@@ -237,7 +237,7 @@ Ordered roughly by risk. "Where" points to the relevant code.
 
 ### Low (cleanup)
 
-- **Dead code**: `whiteKing`, `blackKing`, `this.turn` counter, `removeMoving()` (registers a `movestart` listener), `CheckersRules` alias, `RulesEngine.getCaptureMoves`, `hasLegalMoves` (unused in `script.js`), `takePiece`'s return value, `Piece.color`, and the in-game branch of `setRuleset`, which is unreachable since the setup menu is only shown before a game.
+- **Dead code**: `whiteKing`, `blackKing`, `this.turn` counter, `removeMoving()` (registers a `movestart` listener), `CheckersRules` alias, `RulesEngine.getCaptureMoves`, `hasLegalMoves` (unused in `script.js`), `Piece.color`, and the in-game branch of `setRuleset`, which is unreachable since the setup menu is only shown before a game.
 - **Latent bug**: `playSound("notify")` references `this.notify`, which is never created.
 - **Unhandled promise rejections**: `Audio.play()` is not awaited or caught (autoplay restrictions). All three audio files are created eagerly at start-up.
 - **`/*jshint esversion: 6 */` is outdated**: the code uses object spread (ES2018), `async/await` (ES2017) and ES modules. Update the config and re-run JSHint; the README screenshot is likely stale.

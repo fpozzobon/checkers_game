@@ -1,28 +1,7 @@
 import { GameState } from "./game-state.js";
+import { getBoardSize, RULESETS } from "./rulesets.js";
 
-export const RULESETS = Object.freeze({
-  british: Object.freeze({
-    boardSize: 8,
-    menCaptureBackward: false,
-    flyingKings: false,
-    longestCaptureMandatory: false
-  }),
-  international: Object.freeze({
-    boardSize: 10,
-    menCaptureBackward: true,
-    flyingKings: true,
-    longestCaptureMandatory: true
-  })
-});
-
-export function getBoardSize(ruleset = "international") {
-  if (!RULESETS[ruleset]) throw new RangeError(`Unsupported ruleset: ${ruleset}`);
-  return RULESETS[ruleset].boardSize;
-}
-
-export function getSquareCount(ruleset = "international") {
-  return getBoardSize(ruleset) ** 2;
-}
+export { getBoardSize, getSquareCount, RULESETS } from "./rulesets.js";
 
 export const BOARD_SIZE = 8;
 export const SQUARE_COUNT = BOARD_SIZE * BOARD_SIZE;
@@ -44,7 +23,7 @@ export class RulesEngine {
     this.squareCount = this.boardSize * this.boardSize;
   }
 
-  getCaptureOptions(state, from) {
+  getCapturePaths(state, from) {
     if (!(state instanceof GameState) && (!state || !Array.isArray(state.squares))) {
       throw new TypeError("A GameState snapshot is required");
     }
@@ -55,13 +34,11 @@ export class RulesEngine {
     const size = this.boardSize;
     const inBoard = (row, column) => row >= 0 && row < size && column >= 0 && column < size;
     const at = (row, column) => row * size + column;
-    const row = Math.floor(from / size);
-    const column = from % size;
     const directions = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
     const occupancy = state.squares.map((item) => item ? { ...item } : null);
     const paths = [];
 
-    const search = (current, isKing, captured) => {
+    const search = (current, isKing, captured, steps) => {
       let foundCapture = false;
       if (isKing && this.config.flyingKings) {
         const currentRow = Math.floor(current / size);
@@ -75,19 +52,30 @@ export class RulesEngine {
             const occupant = occupancy[square];
             if (enemy === null) {
               if (occupant) {
-                if (occupant.color !== piece.color) enemy = square;
+                if (
+                  occupant.color !== piece.color &&
+                  !captured.includes(square) &&
+                  !(state.pendingCaptures || []).includes(square)
+                ) {
+                  enemy = square;
+                }
                 else break;
               }
             } else {
               if (occupant) break;
               const nextOccupancy = occupancy.map((item) => item ? { ...item } : null);
               nextOccupancy[current] = null;
-              nextOccupancy[enemy] = null;
+              if (!this.config.deferCapturedPieces) nextOccupancy[enemy] = null;
               nextOccupancy[square] = { color: piece.color, king: true };
               const original = occupancy.map((item) => item ? { ...item } : null);
               for (let i = 0; i < occupancy.length; i++) occupancy[i] = nextOccupancy[i];
               foundCapture = true;
-              search(square, true, [...captured, enemy]);
+              search(
+                square,
+                true,
+                [...captured, enemy],
+                [...steps, { to: square, capture: enemy }]
+              );
               for (let i = 0; i < occupancy.length; i++) occupancy[i] = original[i];
             }
             nextRow += rowStep;
@@ -111,37 +99,70 @@ export class RulesEngine {
           const enemy = at(enemyRow, enemyColumn);
           const landing = at(landingRow, landingColumn);
           const enemyPiece = occupancy[enemy];
-          if (enemyPiece && enemyPiece.color !== piece.color && occupancy[landing] === null) {
+          if (
+            enemyPiece &&
+            enemyPiece.color !== piece.color &&
+            !captured.includes(enemy) &&
+            !(state.pendingCaptures || []).includes(enemy) &&
+            occupancy[landing] === null
+          ) {
             const nextOccupancy = occupancy.map((item) => item ? { ...item } : null);
             nextOccupancy[current] = null;
-            nextOccupancy[enemy] = null;
+            if (!this.config.deferCapturedPieces) nextOccupancy[enemy] = null;
             const promotionRow = landingRow === 0 || landingRow === size - 1;
             const becomesKing = isKing || promotionRow;
             nextOccupancy[landing] = { color: piece.color, king: becomesKing };
             const original = occupancy.map((item) => item ? { ...item } : null);
             for (let i = 0; i < occupancy.length; i++) occupancy[i] = nextOccupancy[i];
             foundCapture = true;
+            const nextSteps = [...steps, { to: landing, capture: enemy }];
             if (becomesKing && !isKing) {
-              paths.push({ to: landing, captures: [...captured, enemy] });
+              paths.push({
+                to: landing,
+                captures: [...captured, enemy],
+                steps: nextSteps
+              });
             } else {
-              search(landing, becomesKing, [...captured, enemy]);
+              search(landing, becomesKing, [...captured, enemy], nextSteps);
             }
             for (let i = 0; i < occupancy.length; i++) occupancy[i] = original[i];
           }
         });
       }
       if (!foundCapture && captured.length > 0) {
-        paths.push({ to: current, captures: [...captured] });
+        paths.push({ to: current, captures: [...captured], steps });
       }
     };
 
-    search(from, Boolean(piece.king), []);
-    if (paths.length === 0) return [];
-    if (this.config.longestCaptureMandatory) {
-      const longest = Math.max(...paths.map((path) => path.captures.length));
-      return paths.filter((path) => path.captures.length === longest);
-    }
+    search(from, Boolean(piece.king), [], []);
     return paths;
+  }
+
+  getFirstCaptureOptions(paths, longest = null) {
+    const options = new Map();
+    paths.forEach((path) => {
+      if (longest !== null && path.captures.length !== longest) return;
+      const step = path.steps[0];
+      if (!options.has(step.to)) {
+        options.set(step.to, { to: step.to, captures: [step.capture] });
+      }
+    });
+    return [...options.values()];
+  }
+
+  getCaptureOptions(state, from) {
+    if (!(state instanceof GameState) && (!state || !Array.isArray(state.squares))) {
+      throw new TypeError("A GameState snapshot is required");
+    }
+    if (state.continuationSquare != null && state.continuationSquare !== from) {
+      return [];
+    }
+    const paths = this.getCapturePaths(state, from);
+    if (paths.length === 0) return [];
+    const longest = this.config.longestCaptureMandatory
+      ? Math.max(...paths.map((path) => path.captures.length))
+      : null;
+    return this.getFirstCaptureOptions(paths, longest);
   }
 
   getSimpleMoves(state, from) {
@@ -188,23 +209,33 @@ export class RulesEngine {
     const captures = new Map();
     let longest = 0;
     for (let from = 0; from < this.squareCount; from++) {
+      if (state.continuationSquare != null && from !== state.continuationSquare) {
+        continue;
+      }
       const piece = state.squares[from];
       if (piece && piece.color === color) {
-        const options = this.getCaptureOptions(state, from);
-        if (options.length > 0) {
-          const length = Math.max(...options.map((option) => option.captures.length));
+        const paths = this.getCapturePaths(state, from);
+        if (paths.length > 0) {
+          const length = Math.max(...paths.map((path) => path.captures.length));
           longest = Math.max(longest, length);
-          captures.set(from, options);
+          captures.set(from, { paths, length });
         }
       }
     }
     if (this.config.longestCaptureMandatory) {
-      for (const [from, options] of captures) {
-        const longestForPiece = options.filter(
-          (option) => option.captures.length === longest
+      for (const [from, result] of captures) {
+        if (result.length !== longest) {
+          captures.delete(from);
+          continue;
+        }
+        captures.set(
+          from,
+          this.getFirstCaptureOptions(result.paths, result.length)
         );
-        captures.set(from, longestForPiece);
-        if (longestForPiece.length === 0) captures.delete(from);
+      }
+    } else {
+      for (const [from, result] of captures) {
+        captures.set(from, this.getFirstCaptureOptions(result.paths));
       }
     }
     return captures;
@@ -219,6 +250,7 @@ export class RulesEngine {
 
     const captures = this.getCaptureOptions(state, from);
     if (captures.length > 0) return captures.map((option) => option.to);
+    if (state.continuationSquare != null) return [];
 
     const mandatory = this.getMandatoryCaptures(state, piece.color);
     if (mandatory.size > 0) return [];
@@ -233,6 +265,12 @@ export class RulesEngine {
     if (!command || !Number.isInteger(command.from) || !Number.isInteger(command.to)) {
       return { valid: false, error: "Move must contain integer from and to squares" };
     }
+    if (
+      state.continuationSquare != null &&
+      command.from !== state.continuationSquare
+    ) {
+      return { valid: false, error: "The same piece must continue capturing" };
+    }
     const piece = state.squares[command.from];
     if (!piece) return { valid: false, error: "The source square is empty" };
     if (piece.color !== state.turn) return { valid: false, error: "It is not this piece's turn" };
@@ -240,6 +278,9 @@ export class RulesEngine {
 
     const mandatory = this.getMandatoryCaptures(state, piece.color);
     const options = this.getCaptureOptions(state, command.from);
+    if (state.continuationSquare != null && options.length === 0) {
+      return { valid: false, error: "A capture continuation is mandatory" };
+    }
     if (mandatory.size > 0) {
       if (!mandatory.has(command.from)) {
         return { valid: false, error: "A capture is mandatory" };

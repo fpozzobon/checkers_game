@@ -1,7 +1,12 @@
 //Board class that create and command the game
 /*jshint esversion: 6 */
 import { GameState } from "./core/game-state.js";
-import { RulesEngine, getBoardSize, getSquareCount } from "./core/rules-engine.js";
+import {
+  RulesEngine,
+  getBoardSize,
+  getSquareCount,
+  RULESETS
+} from "./core/rules-engine.js";
 
 const translations = {
   en: {
@@ -177,7 +182,7 @@ class Board {
     this.needTake = []; // save pieces that need to take
     // takeIt info to take a piece: actualPieceId, enemySquareId, opositeSquareId
     this.takeIt = [];
-    this.pieceTaking = null; //keeps the piece that is taking
+    this.pieceTaking = null;
     this.moveSound = new Audio("assets/audio/move.mp3");
     this.takeSound = new Audio("assets/audio/capture.mp3");
     this.menu = new Audio("assets/audio/menu.mp3");
@@ -263,16 +268,6 @@ class Board {
       throw new Error(`No rendered piece matches source square ${from}`);
     }
     const movingColor = state.squares[from].color;
-    const capturedColors = validation.captures.map(
-      (square) => state.squares[square].color
-    );
-    const capturedElements = validation.captures.map((square) => {
-      const piece = this.pieceElements[square];
-      if (!piece || this.piecePositions.get(piece) !== square) {
-        throw new Error(`No rendered piece matches captured square ${square}`);
-      }
-      return piece;
-    });
 
     let keepTurn = false;
     if (validation.capture) {
@@ -288,6 +283,21 @@ class Board {
         this.rulesEngine.getCaptureOptions(provisional, to).length > 0;
     }
 
+    const capturedSquaresToRemove =
+      RULESETS[this.gameState.ruleset].deferCapturedPieces && keepTurn
+        ? []
+        : [...new Set([...(state.pendingCaptures || []), ...validation.captures])];
+    const capturedColors = capturedSquaresToRemove.map(
+      (square) => state.squares[square].color
+    );
+    const capturedElements = capturedSquaresToRemove.map((square) => {
+      const piece = this.pieceElements[square];
+      if (!piece || this.piecePositions.get(piece) !== square) {
+        throw new Error(`No rendered piece matches captured square ${square}`);
+      }
+      return piece;
+    });
+
     const snapshot = this.gameState.applyMove({
       from,
       to,
@@ -299,11 +309,16 @@ class Board {
 
     document.dispatchEvent(
       new CustomEvent("checkers:move", {
-        detail: { from, to, captures: validation.captures.slice() }
+        detail: {
+          from,
+          to,
+          captures: validation.captures.slice(),
+          pendingCaptures: this.gameState.pendingCaptures.slice()
+        }
       })
     );
 
-    validation.captures.forEach((capturedSquare, index) => {
+    capturedSquaresToRemove.forEach((capturedSquare, index) => {
       const capturedPiece = capturedElements[index];
       const capturedColor = capturedColors[index];
       capturedPiece.classList.remove(`piece-${capturedColor}`);
@@ -501,7 +516,7 @@ class Board {
         item.addEventListener("click", this.pieceClick);
       });
       setTimeout(() => {
-        this.checkWinner();
+        if (!this.pieceTaking) this.checkWinner();
       }, 1000);
 
       const playerColor = this.playerColor.slice("piece-".length);
@@ -527,7 +542,7 @@ class Board {
         item.movable = false;
       });
       setTimeout(() => {
-        this.checkWinner();
+        if (!this.pieceTaking) this.checkWinner();
       }, 1000);
       const computerColor = this.computerColor.slice("piece-".length);
       const computerPieces = this.getPieces(computerColor);
@@ -670,7 +685,6 @@ class Board {
       dragSquares.forEach((item) => {
         item.classList.remove("possible");
       });
-      board.pieceTaking = null;
       board.gameControl();
     }
   }
@@ -686,15 +700,13 @@ class Board {
       this.computerColor.slice("piece-".length)
     );
     let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : computerPieces;
-    let captureOptions = this.getComputerCaptures(piecesToCheck);
-    let captureCount = 0;
+    const captureOptions = this.getComputerCaptures(piecesToCheck);
 
     if (captureOptions.length > 0) {
-      while (captureOptions.length > 0 && captureCount < 12) {
-        this.takeIt = captureOptions;
-        board.takePiece();
-        captureCount++;
-        captureOptions = this.getComputerCaptures([this.pieceTaking]);
+      this.takeIt = captureOptions;
+      if (this.takePiece()) {
+        setTimeout(() => this.computerMove(), 500);
+        return;
       }
     } else {
       board.moveComputerPiece();
@@ -720,13 +732,14 @@ class Board {
     }
     const wasKing = pieceState.king;
     const destinationId = Number(destination.id);
-    const captures = capturedSquare ? [Number(capturedSquare.id)] : [];
+    const captures =
+      capturedSquare != null ? [Number(capturedSquare.id)] : [];
     const simulation = GameState.fromJSON(this.gameState.toJSON());
     simulation.applyMove({
       from,
       to: destinationId,
       captures,
-      keepTurn: true,
+      keepTurn: false,
       revision: simulation.revision
     });
 
