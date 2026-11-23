@@ -1,8 +1,14 @@
-const BOARD_SIZE = 8;
-const SQUARE_COUNT = BOARD_SIZE * BOARD_SIZE;
+const RULESETS = Object.freeze({
+  british: 8,
+  international: 10
+});
+
+function getBoardSize(ruleset) {
+  return RULESETS[ruleset];
+}
 
 function assertSquare(square) {
-  if (!Number.isInteger(square) || square < 0 || square >= SQUARE_COUNT) {
+  if (!Number.isInteger(square) || square < 0) {
     throw new RangeError(`Invalid board square: ${square}`);
   }
 }
@@ -20,15 +26,17 @@ function copyPiece(piece) {
  * and turn ownership before applying a move already accepted by that engine.
  */
 export class GameState {
-  constructor({ squares, turn = "white", ruleset = "flying", revision = 0 }) {
-    if (!Array.isArray(squares) || squares.length !== SQUARE_COUNT) {
-      throw new TypeError(`Expected ${SQUARE_COUNT} board squares`);
+  constructor({ squares, turn = "white", ruleset = "british", revision = 0 }) {
+    if (!RULESETS[ruleset]) {
+      throw new RangeError(`Invalid ruleset: ${ruleset}`);
+    }
+    const boardSize = getBoardSize(ruleset);
+    const squareCount = boardSize * boardSize;
+    if (!Array.isArray(squares) || squares.length !== squareCount) {
+      throw new TypeError(`Expected ${squareCount} board squares`);
     }
     if (turn !== "white" && turn !== "black") {
       throw new RangeError(`Invalid player turn: ${turn}`);
-    }
-    if (ruleset !== "flying" && ruleset !== "british") {
-      throw new RangeError(`Invalid ruleset: ${ruleset}`);
     }
     if (!Number.isSafeInteger(revision) || revision < 0) {
       throw new RangeError(`Invalid state revision: ${revision}`);
@@ -68,8 +76,14 @@ export class GameState {
    * { from, to, captures?: number[], keepTurn?: boolean, revision? }
    */
   applyMove({ from, to, captures = [], keepTurn = false, revision }) {
-    assertSquare(from);
-    assertSquare(to);
+    const boardSize = getBoardSize(this.ruleset);
+    const squareCount = boardSize * boardSize;
+    if (!Number.isInteger(from) || from < 0 || from >= squareCount) {
+      throw new RangeError(`Invalid board square: ${from}`);
+    }
+    if (!Number.isInteger(to) || to < 0 || to >= squareCount) {
+      throw new RangeError(`Invalid board square: ${to}`);
+    }
     if (!Array.isArray(captures)) {
       throw new TypeError("captures must be an array of square indexes");
     }
@@ -98,11 +112,11 @@ export class GameState {
       this.squares[square] = null;
     });
 
-    const row = Math.floor(to / BOARD_SIZE);
+    const row = Math.floor(to / boardSize);
     if (
       !piece.king &&
       ((piece.color === "white" && row === 0) ||
-        (piece.color === "black" && row === BOARD_SIZE - 1))
+        (piece.color === "black" && row === boardSize - 1))
     ) {
       piece.king = true;
     }

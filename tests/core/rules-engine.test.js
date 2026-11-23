@@ -40,17 +40,35 @@ test("British kings move and capture one square diagonally", () => {
   assert.equal(engine.validateMove(state, { from: 18, to: 36 }).valid, true);
 });
 
-test("Flying kings can capture at a distance", () => {
-  const squares = emptySquares();
-  squares[18] = { color: "white", king: true };
-  squares[27] = { color: "black", king: false };
-  const state = stateWith(squares, { ruleset: "flying" });
-  const engine = new RulesEngine("flying");
+test("International kings move and capture at a distance on a 10x10 board", () => {
+  const squares = Array(100).fill(null);
+  squares[22] = { color: "white", king: true };
+  squares[33] = { color: "black", king: false };
+  const state = stateWith(squares, { ruleset: "international" });
+  const engine = new RulesEngine("international");
 
-  const captures = engine.getCaptureOptions(state, 18);
-  assert.ok(captures.some((option) => option.to === 36 && option.captures[0] === 27));
-  assert.ok(captures.some((option) => option.to === 45));
-  assert.ok(captures.some((option) => option.to === 54));
+  assert.deepEqual(engine.getSimpleMoves(state, 22).sort((a, b) => a - b), [
+    0, 4, 11, 13, 31, 40
+  ]);
+  assert.ok(engine.getCaptureOptions(state, 22).some(
+    (option) => option.to === 44 && option.captures[0] === 33
+  ));
+});
+
+test("International rules require the longest capture sequence", () => {
+  const squares = Array(100).fill(null);
+  squares[11] = { color: "white", king: false };
+  squares[22] = { color: "black", king: false };
+  squares[44] = { color: "black", king: false };
+  const state = stateWith(squares, { ruleset: "international" });
+  const engine = new RulesEngine("international");
+
+  const mandatory = engine.getMandatoryCaptures(state, "white");
+  const pieceCaptureLength = [...mandatory.values()].flat().reduce(
+    (maximum, option) => Math.max(maximum, option.captures.length),
+    0
+  );
+  assert.equal(pieceCaptureLength, 2);
 });
 
 test("A mandatory capture blocks ordinary moves", () => {
@@ -100,4 +118,16 @@ test("hasLegalMoves checks only the requested color", () => {
   squares[40] = { color: "white", king: false };
   const playable = stateWith(squares, { turn: "white" });
   assert.equal(engine.hasLegalMoves(playable, "white"), true);
+});
+
+test("hasLegalMoves scans the full International board", () => {
+  const squares = Array(100).fill(null);
+  squares[80] = { color: "white", king: false };
+  const state = stateWith(squares, {
+    turn: "white",
+    ruleset: "international"
+  });
+  const engine = new RulesEngine("international");
+
+  assert.equal(engine.hasLegalMoves(state, "white"), true);
 });
