@@ -1,4 +1,4 @@
-import { getBoardSize, getSquareCount, RULESETS } from "./rulesets.js";
+import { getBoardSize, getSquareCount, RULESETS } from "./rulesets.js?v=0.22";
 
 function assertSquare(square) {
   if (!Number.isInteger(square) || square < 0) {
@@ -176,10 +176,13 @@ export class GameState {
     }
 
     const row = Math.floor(to / boardSize);
+    const reachedPromotionRow =
+      (piece.color === "white" && row === 0) ||
+      (piece.color === "black" && row === boardSize - 1);
     if (
       !piece.king &&
-      ((piece.color === "white" && row === 0) ||
-        (piece.color === "black" && row === boardSize - 1))
+      reachedPromotionRow &&
+      (!keepTurn || !RULESETS[this.ruleset].menCaptureBackward)
     ) {
       piece.king = true;
     }

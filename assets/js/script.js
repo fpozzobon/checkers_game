@@ -1,12 +1,39 @@
 //Board class that create and command the game
-/*jshint esversion: 6 */
-import { GameState } from "./core/game-state.js";
+/*jshint esversion: 11 */
+import { GameState } from "./core/game-state.js?v=0.22";
 import {
   RulesEngine,
   getBoardSize,
   getSquareCount,
   RULESETS
-} from "./core/rules-engine.js";
+} from "./core/rules-engine.js?v=0.22";
+
+const storageFallback = new Map();
+const storage = {
+  get(key, fallback = null) {
+    try {
+      const value = window.localStorage.getItem(key);
+      if (value != null) {
+        storageFallback.set(key, value);
+        return value;
+      }
+      return storageFallback.has(key) ? storageFallback.get(key) : fallback;
+    } catch (error) {
+      console.warn(`Could not read local setting "${key}":`, error);
+      return storageFallback.has(key) ? storageFallback.get(key) : fallback;
+    }
+  },
+  set(key, value) {
+    storageFallback.set(key, String(value));
+    try {
+      window.localStorage.setItem(key, String(value));
+      return true;
+    } catch (error) {
+      console.warn(`Could not save local setting "${key}":`, error);
+      return false;
+    }
+  }
+};
 
 const translations = {
   en: {
@@ -65,7 +92,7 @@ const translations = {
       "A piece that reaches the last row becomes a king. Kings move one square diagonally forward or backward and capture by jumping an adjacent piece.",
     endOfGame: "End of game:",
     endOfGameText:
-      "A player wins by capturing all opposing pieces or leaving the opponent with no legal moves. A draw occurs if neither side can force a win, or after 30 moves by kings without a capture.",
+      "A player wins by capturing all opposing pieces or leaving the opponent with no legal moves.",
     player: "Player",
     computer: "Computer",
     resetScore: "Reset Score"
@@ -126,7 +153,7 @@ const translations = {
       "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Elle se déplace d'une case en diagonale vers l'avant ou l'arrière et prend en sautant par-dessus un pion adjacent.",
     endOfGame: "Fin de partie :",
     endOfGameText:
-      "Un joueur gagne en prenant tous les pions adverses ou en empêchant l'adversaire de jouer. La partie est nulle si aucun camp ne peut forcer la victoire, ou après 30 déplacements de dames sans prise.",
+      "Un joueur gagne en prenant tous les pions adverses ou en empêchant l'adversaire de jouer.",
     player: "Joueur",
     computer: "Ordinateur",
     resetScore: "Réinitialiser les scores"
@@ -146,12 +173,13 @@ function getPreferredLanguage() {
 class Board {
   // Method to create the board
   constructor() {
-    const savedLanguage = localStorage.getItem("language");
+    this.timerIds = new Set();
+    const savedLanguage = storage.get("language");
     this.language =
       savedLanguage === "en" || savedLanguage === "fr"
         ? savedLanguage
         : getPreferredLanguage();
-    const savedRuleset = localStorage.getItem("ruleset");
+    const savedRuleset = storage.get("ruleset");
     this.ruleset =
       savedRuleset === "british" || savedRuleset === "international"
         ? savedRuleset
@@ -163,7 +191,7 @@ class Board {
       ruleset: this.ruleset,
       revision: 0
     });
-    const savedDifficulty = localStorage.getItem("difficulty");
+    const savedDifficulty = storage.get("difficulty");
     this.difficulty =
       savedDifficulty === "easy" ||
       savedDifficulty === "medium" ||
@@ -188,12 +216,12 @@ class Board {
     this.menu = new Audio("assets/audio/menu.mp3");
     this.turn = 0;
     this.optionHighlight = true;
-    this.optionSound = localStorage.getItem("soundEnabled") === "true";
+    this.optionSound = storage.get("soundEnabled") === "true";
     this.soundToggle = document.getElementById("sound-toggle");
     this.updateSoundToggle();
     this.soundToggle.addEventListener("click", () => {
       this.optionSound = !this.optionSound;
-      localStorage.setItem("soundEnabled", String(this.optionSound));
+      storage.set("soundEnabled", this.optionSound);
       this.updateSoundToggle();
       this.playSound("menu");
     });
@@ -210,11 +238,11 @@ class Board {
     this.gameOver = false;
 
     // prepare for score saving
-    if (localStorage.getItem("whiteScore") == null) {
-      localStorage.setItem("whiteScore", "0");
+    if (storage.get("whiteScore") == null) {
+      storage.set("whiteScore", 0);
     }
-    if (localStorage.getItem("blackScore") == null) {
-      localStorage.setItem("blackScore", "0");
+    if (storage.get("blackScore") == null) {
+      storage.set("blackScore", 0);
     }
 
     // create squares
@@ -368,7 +396,7 @@ class Board {
       throw new RangeError(`Unsupported language: ${language}`);
     }
     this.language = language;
-    localStorage.setItem("language", language);
+    storage.set("language", language);
     this.applyLanguage();
     this.updateSoundToggle();
     this.updateFullscreenToggle();
@@ -447,7 +475,7 @@ class Board {
     });
     this.pieceElements = Array(getSquareCount(ruleset)).fill(null);
     this.buildBoard();
-    localStorage.setItem("ruleset", ruleset);
+    storage.set("ruleset", ruleset);
     if (this.isPlaying) {
       this.createPieces();
       this.gameControl();
@@ -490,7 +518,7 @@ class Board {
       throw new RangeError(`Unsupported difficulty: ${difficulty}`);
     }
     this.difficulty = difficulty;
-    localStorage.setItem("difficulty", difficulty);
+    storage.set("difficulty", difficulty);
   }
 
   // Method to start the game
@@ -918,13 +946,9 @@ class Board {
 
     const scoreKey =
       `piece-${color}` === this.playerColor ? "whiteScore" : "blackScore";
-    let score = localStorage.getItem(scoreKey);
-    if (score == null) {
-      score = 0;
-    } else {
-      score = parseInt(score) + 1;
-      localStorage.setItem(scoreKey, String(score));
-    }
+    const parsed = Number.parseInt(storage.get(scoreKey, "0"), 10);
+    const score = Number.isFinite(parsed) ? parsed + 1 : 1;
+    storage.set(scoreKey, score);
   }
 
   // check winner
@@ -934,26 +958,12 @@ class Board {
       return -1;
     }
 
-    let whitePiecesLeft = 0;
-    let blackPiecesLeft = 0;
-
-    // No pieces left
     const whitePieces = this.gameState.squares.filter(
       (piece) => piece && piece.color === "white"
     );
     const blackPieces = this.gameState.squares.filter(
       (piece) => piece && piece.color === "black"
     );
-    this.gameState.squares.forEach((piece, square) => {
-      if (!piece) return;
-      const legalMoves = this.rulesEngine.getLegalMoves(this.gameState, square);
-      if (piece.color === "white") {
-        whitePiecesLeft += legalMoves.length;
-      } else {
-        blackPiecesLeft += legalMoves.length;
-      }
-    });
-
     if (whitePieces.length === 0) {
       this.updateScore("black");
       this.showGameOver(this.translate("blackWinsPieces"));
@@ -962,13 +972,13 @@ class Board {
       this.updateScore("white");
       this.showGameOver(this.translate("whiteWinsPieces"));
       return -1;
-    } else if (whitePiecesLeft == 0) {
-      this.updateScore("black");
-      this.showGameOver(this.translate("blackWinsMoves"));
-      return -1;
-    } else if (blackPiecesLeft == 0) {
-      this.updateScore("white");
-      this.showGameOver(this.translate("whiteWinsMoves"));
+    }
+
+    const sideToMove = this.gameState.turn;
+    if (!this.rulesEngine.hasLegalMoves(this.gameState, sideToMove)) {
+      const winner = sideToMove === "white" ? "black" : "white";
+      this.updateScore(winner);
+      this.showGameOver(this.translate(`${winner}WinsMoves`));
       return -1;
     }
   }
@@ -1012,14 +1022,17 @@ class Board {
   playSound(soundType) {
     /* Play sound */
     if (this.optionSound) {
-      if (soundType == "move") {
-        this.moveSound.play();
-      } else if (soundType == "take") {
-        this.takeSound.play();
-      } else if (soundType == "menu") {
-        this.menu.play();
-      } else if (soundType == "notify") {
-        this.notify.play();
+      const audio =
+        soundType === "move" ? this.moveSound :
+        soundType === "take" ? this.takeSound :
+        soundType === "menu" ? this.menu : null;
+      if (audio) {
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch((error) => {
+            console.debug("Audio playback was blocked:", error);
+          });
+        }
       }
     }
   }
@@ -1520,8 +1533,8 @@ class Menu {
     <div id="close-menu"><i class="far fa-times-circle"></i></div>
     <div class="menu-item new-page" id="results">${board.translate("results")}</div>`;
     // add scores
-    let plyerScore = localStorage.getItem("whiteScore");
-    let computerScore = localStorage.getItem("blackScore");
+    let plyerScore = storage.get("whiteScore", "0");
+    let computerScore = storage.get("blackScore", "0");
     menu.innerHTML += `<p class="submenu results-menu" id="player-score">${board.translate(
       "player"
     )}  ${plyerScore}</p>`;
@@ -1545,8 +1558,8 @@ class Menu {
 
     document.getElementById("reset-score").addEventListener("click", () => {
       board.playSound("menu");
-      localStorage.setItem("whiteScore", 0);
-      localStorage.setItem("blackScore", 0);
+      storage.set("whiteScore", 0);
+      storage.set("blackScore", 0);
       document.getElementById("player-score").textContent = `${board.translate(
         "player"
       )} 0`;

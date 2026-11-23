@@ -3,10 +3,9 @@ let currentTurnHistory = null;
 
 function createCaptureGhost(squareId) {
   const square = document.getElementById(squareId);
+  if (!square) return null;
   const piece = square.querySelector(".piece");
-  if (!piece) {
-    throw new Error(`No rendered captured piece at square ${squareId}`);
-  }
+  if (!piece) return null;
 
   const color = piece.classList.contains("piece-white") ? "white" : "black";
   const ghost = piece.cloneNode(true);
@@ -67,11 +66,14 @@ document.addEventListener("checkers:move", (event) => {
   const pendingCaptureSet = new Set(pendingCaptures);
   currentTurnHistory.moves.push({ from, to });
   captures.forEach((squareId) => {
-    currentTurnHistory.captures.push({
-      squareId,
-      ghost: createCaptureGhost(squareId),
-      pending: pendingCaptureSet.has(squareId)
-    });
+    const ghost = createCaptureGhost(squareId);
+    if (ghost) {
+      currentTurnHistory.captures.push({
+        squareId,
+        ghost,
+        pending: pendingCaptureSet.has(squareId)
+      });
+    }
   });
 
   renderMoveHistory();
