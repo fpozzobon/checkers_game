@@ -313,7 +313,9 @@ class Board {
           from,
           to,
           captures: validation.captures.slice(),
-          pendingCaptures: this.gameState.pendingCaptures.slice()
+          pendingCaptures: this.gameState.pendingCaptures.slice(),
+          mover: movingColor,
+          turnCompleted: !keepTurn
         }
       })
     );

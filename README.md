@@ -242,7 +242,7 @@ Ordered roughly by risk. "Where" points to the relevant code.
 - **Unhandled promise rejections**: `Audio.play()` is not awaited or caught (autoplay restrictions). All three audio files are created eagerly at start-up.
 - **`/*jshint esversion: 6 */` is outdated**: the code uses object spread (ES2018), `async/await` (ES2017) and ES modules. Update the config and re-run JSHint; the README screenshot is likely stale.
 - **Font Awesome is loaded twice**, as v4.7 CSS and v5.0.6 JS from two different CDNs, and the menu mixes `fa` and `far` classes. Neither include has SRI. Pick one version, preferably self-hosted.
-- **Manual cache-busting**: version `0.21` is hard-coded in five places in `index.html` (two CSS, two JS, and the `#app-version` text).
+- **Manual cache-busting**: version `0.22` is hard-coded in five places in `index.html` (two CSS, two JS, and the `#app-version` text).
 - **Leftover template metadata** in `index.html`: `author` / `copyright` mention "247games LLC", and `X-UA-Compatible` (IE) is obsolete. Confirm they are intended.
 - **Naming and typos**: `plyerScore`, `get_piece`, `checkpossibleMove` (mixed styles); the original README had `rel="nofolow"` and "Lighhouse".
 - **Screenshots** in `assets/images` show the old menu layout (single menu with Start/Options/Rules/Results). Retake them.
