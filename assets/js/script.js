@@ -9,6 +9,7 @@ const {
   getSquareCount,
   RULESETS
 } = await import(`./core/rules-engine.js?${coreVersion}`);
+const { FrenchChat } = await import(`./chat/french_chat.js?${coreVersion}`);
 
 const storageFallback = new Map();
 const storage = {
@@ -253,6 +254,7 @@ class Board {
 
   buildBoard() {
     const boardSize = getBoardSize(this.ruleset);
+    this.game.dataset.boardSize = String(boardSize);
     this.game.querySelectorAll(".square").forEach((square) => square.remove());
     this.game.style.gridTemplateColumns = `repeat(${boardSize}, auto)`;
     const squareSize = boardSize === 10 ? "8vmin" : "10vmin";
@@ -969,11 +971,11 @@ class Board {
     );
     if (whitePieces.length === 0) {
       this.updateScore("black");
-      this.showGameOver(this.translate("blackWinsPieces"));
+      this.showGameOver(this.translate("blackWinsPieces"), "black");
       return -1;
     } else if (blackPieces.length === 0) {
       this.updateScore("white");
-      this.showGameOver(this.translate("whiteWinsPieces"));
+      this.showGameOver(this.translate("whiteWinsPieces"), "white");
       return -1;
     }
 
@@ -981,13 +983,16 @@ class Board {
     if (!this.rulesEngine.hasLegalMoves(this.gameState, sideToMove)) {
       const winner = sideToMove === "white" ? "black" : "white";
       this.updateScore(winner);
-      this.showGameOver(this.translate(`${winner}WinsMoves`));
+      this.showGameOver(this.translate(`${winner}WinsMoves`), winner);
       return -1;
     }
   }
 
-  showGameOver(message) {
+  showGameOver(message, winner) {
     this.gameOver = true;
+    document.dispatchEvent(
+      new CustomEvent("checkers:gameover", { detail: { winner } })
+    );
     const overlay = document.createElement("div");
     overlay.id = "game-over";
     overlay.className = "game-over";
@@ -1404,6 +1409,7 @@ class Menu {
       );
       board.startGame();
       board.isPlaying = true;
+      chat.start();
       board.menuIsOpen = false;
       this.hiddenMenu();
     });
@@ -1581,6 +1587,21 @@ class Menu {
 // Game menu
 const board = new Board();
 window.checkersBoard = board;
+const chat = new FrenchChat({
+  toggleButton: document.getElementById("chat-toggle"),
+  panel: document.getElementById("computer-chat"),
+  log: document.getElementById("chat-log"),
+  personaLabel: document.getElementById("chat-persona"),
+  form: document.getElementById("chat-form"),
+  input: document.getElementById("chat-input"),
+  sendButton: document.getElementById("chat-send"),
+  getContext: () => ({
+    playerCaptures: chat.playerCaptures,
+    computerCaptures: chat.computerCaptures,
+    moves: board.gameState.revision,
+    result: chat.result
+  })
+});
 const menu = new Menu();
 menu.createMenu();
 document.addEventListener("click", (event) => {

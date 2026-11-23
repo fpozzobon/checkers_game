@@ -30,6 +30,19 @@
         </div>
         <button id="sound-toggle" type="button" aria-pressed="false"></button>
         <button id="fullscreen-toggle" type="button"></button>
+        <button id="chat-toggle" type="button" aria-controls="computer-chat" aria-expanded="false" hidden>💬</button>
+        <section id="computer-chat" lang="fr" aria-label="Conversation avec l’ordinateur" hidden>
+            <header class="chat-header">
+                <h2>Conversation</h2>
+                <span id="chat-persona"></span>
+            </header>
+            <div id="chat-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+            <form id="chat-form">
+                <label class="sr-only" for="chat-input">Votre message</label>
+                <input id="chat-input" type="text" maxlength="280" autocomplete="off" placeholder="Écrivez un message…" disabled>
+                <button id="chat-send" type="submit" disabled>Envoyer</button>
+            </form>
+        </section>
         <div id="app-version"></div>
     </div>
     <script defer src="https://use.fontawesome.com/releases/v5.0.6/js/all.js"></script>

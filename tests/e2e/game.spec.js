@@ -167,3 +167,46 @@ test("runs a full computer-vs-computer party", async ({ page }) => {
   expect(finalState.revision).toBeGreaterThan(initialRevision);
   expect(finalState.pieceCount).toBeLessThanOrEqual(24);
 });
+
+test("French chat is shown below the board on desktop and toggles on compact screens", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  await page.locator("#vs-computer").click();
+  await page.locator("#start-computer").click();
+
+  await expect(page.locator("#chat-toggle")).toBeVisible();
+  await expect(page.locator("#computer-chat")).toBeVisible();
+  await expect(page.locator("#chat-persona")).toContainText(/·/);
+
+  const [boardBounds, squareBounds, chatTop] = await Promise.all([
+    page.locator("#game").evaluate(board => {
+      const { top, width, height, bottom } = board.getBoundingClientRect();
+      return { top, width, height, bottom };
+    }),
+    page.locator("#game > .square").first().evaluate(square => {
+      const { width, height } = square.getBoundingClientRect();
+      return { width, height };
+    }),
+    page.locator("#computer-chat").evaluate(chat => chat.getBoundingClientRect().top)
+  ]);
+  expect(boardBounds.top).toBeGreaterThanOrEqual(16);
+  expect(Math.abs(boardBounds.width - boardBounds.height)).toBeLessThan(1);
+  expect(Math.abs(squareBounds.width - squareBounds.height)).toBeLessThan(1);
+  expect(chatTop).toBeGreaterThanOrEqual(boardBounds.bottom);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight))
+    .toBeLessThanOrEqual(900);
+
+  const input = page.locator("#chat-input");
+  await expect(input).toBeEnabled();
+  await input.fill("Bien joué !");
+  const sentAt = Date.now();
+  await page.locator("#chat-send").click();
+  const reply = page.locator(".chat-message-computer").last();
+  await expect(reply).toContainText(/Merci !/);
+  expect(Date.now() - sentAt).toBeGreaterThanOrEqual(650);
+
+  await page.setViewportSize({ width: 390, height: 700 });
+  await expect(page.locator("#computer-chat")).toBeHidden();
+  await page.locator("#chat-toggle").click();
+  await expect(page.locator("#computer-chat")).toBeVisible();
+});
