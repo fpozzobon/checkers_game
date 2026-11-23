@@ -1,7 +1,12 @@
 //Board class that create and command the game
 /*jshint esversion: 6 */
-import { GameState } from "./core/game-state.js?v=0.23";
-import { RulesEngine } from "./core/rules-engine.js?v=0.23";
+import { GameState } from "./core/game-state.js?v=0.24";
+import {
+  RulesEngine,
+  getBoardSize,
+  getSquareCount,
+  RULESETS
+} from "./core/rules-engine.js?v=0.24";
 
 const translations = {
   en: {
@@ -285,20 +290,6 @@ class Board {
       return { valid: false, error: `No rendered piece matches source square ${from}`, keepTurn: false };
     }
     const movingColor = state.squares[from].color;
-    const capturedColors = validation.captures.map(
-      (square) => state.squares[square].color
-    );
-    const capturedElements = validation.captures.map((square) => {
-      const piece = this.pieceElements[square];
-      if (!piece || this.piecePositions.get(piece) !== square) {
-        return null;
-      }
-      return piece;
-    });
-    if (capturedElements.some((piece) => !piece)) {
-      return { valid: false, error: "Rendered capture state does not match the game state", keepTurn: false };
-    }
-
     let keepTurn = false;
     if (validation.capture) {
       const provisional = GameState.fromJSON(state.toJSON());
@@ -337,7 +328,7 @@ class Board {
     });
     this.gameState = GameState.fromJSON(snapshot);
 
-    validation.captures.forEach((capturedSquare, index) => {
+    capturedSquaresToRemove.forEach((capturedSquare, index) => {
       const capturedPiece = capturedElements[index];
       const capturedColor = capturedColors[index];
       capturedPiece.classList.remove(`piece-${capturedColor}`);
@@ -366,6 +357,8 @@ class Board {
           from,
           to,
           captures: validation.captures.slice(),
+          capturedSquares: capturedSquaresToRemove.slice(),
+          pendingCaptures: this.gameState.pendingCaptures.slice(),
           capturedColors,
           capturedPieces: capturedElements.map((piece) => piece.cloneNode(true))
         }
