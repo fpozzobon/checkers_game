@@ -1,7 +1,10 @@
-import { GameState } from "./game-state.js?v=0.22";
-import { getBoardSize, RULESETS } from "./rulesets.js?v=0.22";
+const APP_VERSION = globalThis.APP_VERSION || "0.23";
+const { GameState } =
+  await import(`./game-state.js?v=${encodeURIComponent(APP_VERSION)}`);
+const { getBoardSize, getSquareCount, RULESETS } =
+  await import(`./rulesets.js?v=${encodeURIComponent(APP_VERSION)}`);
 
-export { getBoardSize, getSquareCount, RULESETS } from "./rulesets.js?v=0.22";
+export { getBoardSize, getSquareCount, RULESETS };
 
 export class RulesEngine {
   constructor(ruleset = "international") {

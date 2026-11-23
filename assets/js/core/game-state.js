@@ -1,4 +1,6 @@
-import { getBoardSize, getSquareCount, RULESETS } from "./rulesets.js?v=0.22";
+const APP_VERSION = globalThis.APP_VERSION || "0.23";
+const { getBoardSize, getSquareCount, RULESETS } =
+  await import(`./rulesets.js?v=${encodeURIComponent(APP_VERSION)}`);
 
 function assertSquare(square) {
   if (!Number.isInteger(square) || square < 0) {

@@ -244,7 +244,7 @@ Ordered roughly by risk. "Where" points to the relevant code.
 | 11 | **Timers are never cancelled** (computer move, `checkWinner`, 3 s fullscreen error). "Restart" works only because it reloads the page. | `gameControl`, `toggleFullscreen` | Track timer ids; clear on restart. |
 | 12 | **Checking for a winner on a 1 s timer** after every turn, and `checkWinner` counts *moves* in variables called `...PiecesLeft`. | `checkWinner` | Check right after each move, only for the side to move, and rename variables. |
 | 13 | **Accessibility**: the close and back controls (`#close-menu`, `#rules-back`) are `<div>` icons (not focusable or keyboard operable); the game-over dialog does not trap focus or close on Escape; pieces and squares are `<div>`s, so the board is not keyboard playable. | `Menu.*`, `showGameOver` | Use `<button>`s with labels; add keyboard controls. |
-| 14 | **Core modules are not cache-busted**: `index.html` versions `script.js` with `?v=0.22`, but the `import` lines for `core/*.js` have no version, so browsers can keep stale rules code after a release. | `script.js`, `rules-engine.js`, `game-state.js` | Add the version to the import URLs, or use a build step or hashed file names. |
+| 14 | **Cache versioning**: one `APP_VERSION` global in `index.html` currently patches the CSS and JS URLs. A build or hashed filenames would reduce repeated manual setup. | `index.html`, `script.js`, core modules | Keep the global version and use hashed filenames or a build step for stronger cache guarantees. |
 
 ### Low (cleanup)
 
@@ -255,7 +255,7 @@ Ordered roughly by risk. "Where" points to the relevant code.
 - **Unhandled promise rejections**: `Audio.play()` is not awaited or caught (autoplay restrictions). All three audio files are created eagerly at start-up.
 - **`/*jshint esversion: 6 */` is outdated**: the code uses object spread (ES2018), `async/await` (ES2017) and ES modules. Update the config and re-run JSHint; the README screenshot is likely stale.
 - **Font Awesome is loaded twice**, as v4.7 CSS and v5.0.6 JS from two different CDNs, and the menu mixes `fa` and `far` classes. Neither include has SRI. Pick one version, preferably self-hosted.
-- **Manual cache-busting**: version `0.22` is hard-coded in five places in `index.html` (two CSS, two JS, and the `#app-version` text).
+- **Manual cache-busting**: version `0.23` is centralized in the `APP_VERSION` global in `index.html`; page resources are rewritten with that value at load time.
 - **Leftover template metadata** in `index.html`: `author` / `copyright` mention "247games LLC", and `X-UA-Compatible` (IE) is obsolete. Confirm they are intended.
 - **Naming and typos**: `plyerScore`, `get_piece`, `checkpossibleMove` (mixed styles). The `#options` id is reused for the title of the Rules screen, and `#rules-back` for the back control of the Results screen.
 - **Screenshots** in `assets/images` show the old menu layout (single menu with Start/Options/Rules/Results). Retake them.

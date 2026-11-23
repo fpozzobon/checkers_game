@@ -1,12 +1,14 @@
 //Board class that create and command the game
 /*jshint esversion: 11 */
-import { GameState } from "./core/game-state.js?v=0.22";
-import {
+const APP_VERSION = window.APP_VERSION || "0.23";
+const coreVersion = `v=${encodeURIComponent(APP_VERSION)}`;
+const { GameState } = await import(`./core/game-state.js?${coreVersion}`);
+const {
   RulesEngine,
   getBoardSize,
   getSquareCount,
   RULESETS
-} from "./core/rules-engine.js?v=0.22";
+} = await import(`./core/rules-engine.js?${coreVersion}`);
 
 const storageFallback = new Map();
 const storage = {
