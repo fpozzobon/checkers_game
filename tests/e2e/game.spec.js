@@ -37,6 +37,16 @@ test("ruleset selection, Rules screen, and capture history preserve the board", 
     }));
   });
   await expect(page.locator(".last-captured-ghost")).toHaveCount(2);
+  await expect(page.locator("#removedw .capture-counter")).toHaveText("2");
+  await expect(page.locator("#removedw .capture-counter")).toHaveClass(/capture-counter-white/);
+  await expect(page.locator("#removedw .piece-out-white")).toHaveCount(0);
+  const [counterTop, boardTop] = await Promise.all([
+    page.locator("#removedw .capture-counter").evaluate((counter) =>
+      counter.getBoundingClientRect().top
+    ),
+    page.locator("#game").evaluate((board) => board.getBoundingClientRect().top)
+  ]);
+  expect(counterTop).toBeLessThanOrEqual(boardTop + 1);
   await page.evaluate(() => {
     document.dispatchEvent(new CustomEvent("checkers:move", {
       detail: {
@@ -50,6 +60,20 @@ test("ruleset selection, Rules screen, and capture history preserve the board", 
     }));
   });
   await expect(page.locator(".last-captured-ghost")).toHaveCount(0);
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent("checkers:move", {
+      detail: {
+        from: 66,
+        to: 77,
+        captures: [31],
+        pendingCaptures: [],
+        mover: "black",
+        turnCompleted: true
+      }
+    }));
+  });
+  await expect(page.locator("#removedb .capture-counter")).toHaveText("1");
+  await expect(page.locator("#removedb .capture-counter")).toHaveClass(/capture-counter-black/);
 
   await page.locator(".menu-hidden").click();
   await page.locator("#rules").click();

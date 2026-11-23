@@ -1,6 +1,6 @@
 //Board class that create and command the game
 /*jshint esversion: 11 */
-const APP_VERSION = window.APP_VERSION || "0.24";
+const APP_VERSION = window.APP_VERSION || "0.26";
 const coreVersion = `v=${encodeURIComponent(APP_VERSION)}`;
 const { GameState } = await import(`./core/game-state.js?${coreVersion}`);
 const {
@@ -317,9 +317,6 @@ class Board {
       RULESETS[this.gameState.ruleset].deferCapturedPieces && keepTurn
         ? []
         : [...new Set([...(state.pendingCaptures || []), ...validation.captures])];
-    const capturedColors = capturedSquaresToRemove.map(
-      (square) => state.squares[square].color
-    );
     const capturedElements = capturedSquaresToRemove.map((square) => {
       const piece = this.pieceElements[square];
       if (!piece || this.piecePositions.get(piece) !== square) {
@@ -352,13 +349,7 @@ class Board {
 
     capturedSquaresToRemove.forEach((capturedSquare, index) => {
       const capturedPiece = capturedElements[index];
-      const capturedColor = capturedColors[index];
-      capturedPiece.classList.remove(`piece-${capturedColor}`);
-      capturedPiece.classList.add(`piece-out-${capturedColor}`);
-      const tray = document.getElementById(
-        movingColor === "white" ? "removedw" : "removedb"
-      );
-      tray.appendChild(capturedPiece);
+      capturedPiece.remove();
       this.pieceElements[capturedSquare] = null;
       this.piecePositions.set(capturedPiece, null);
       document.getElementById(capturedSquare).setAttribute("occupied", "false");

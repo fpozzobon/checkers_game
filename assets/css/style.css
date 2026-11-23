@@ -888,6 +888,7 @@ p {
   width: 4.8vmin;
   display: inline-grid;
   position: relative;
+  align-self: stretch;
 }
 
 #removedb {
@@ -895,4 +896,40 @@ p {
   position: relative;
   width: 4.8vmin;
   display: inline-grid;
+  align-self: stretch;
+}
+
+.capture-counter {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  min-width: 1.8em;
+  padding: 0.25em 0.45em;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  background: rgb(80, 40, 11);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: max(10px, 2vmin);
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.capture-counter-white {
+  border-color: #fff;
+  background: #f5f0e6;
+  color: #242424;
+  top: auto;
+  bottom:0;
+}
+
+.capture-counter-black {
+  border-color: #aaa;
+  background: #222;
+  color: #fff;
 }
