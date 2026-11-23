@@ -1,6 +1,6 @@
 // Render move history from accepted game-state commands.
 document.addEventListener("checkers:move", (event) => {
-  const { from, to, captures } = event.detail;
+  const { from, to, captures, capturedColors, capturedPieces } = event.detail;
   document.querySelectorAll(".square.last-move").forEach((square) => {
     square.classList.remove("last-move");
   });
@@ -15,12 +15,11 @@ document.addEventListener("checkers:move", (event) => {
 
   captures.forEach((capturedSquareId) => {
     const capturedSquare = document.getElementById(capturedSquareId);
-    const piece = capturedSquare.querySelector(".piece");
-    if (!piece) {
-      throw new Error(`No rendered captured piece at square ${capturedSquareId}`);
-    }
-
-    const color = piece.classList.contains("piece-white") ? "white" : "black";
+    const capturedIndex = captures.indexOf(capturedSquareId);
+    const color = capturedColors?.[capturedIndex]
+      || (capturedSquare.classList.contains("piece-white") ? "white" : "black");
+    const piece = capturedPieces?.[capturedIndex];
+    if (!piece) return;
     const ghost = piece.cloneNode(true);
     ghost.removeAttribute("id");
     ghost.classList.remove(
