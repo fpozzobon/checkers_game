@@ -1,4 +1,4 @@
-const APP_VERSION = globalThis.APP_VERSION || "0.24";
+const APP_VERSION = globalThis.APP_VERSION || "0.26";
 const { getBoardSize, getSquareCount, RULESETS } =
   await import(`./rulesets.js?v=${encodeURIComponent(APP_VERSION)}`);
 

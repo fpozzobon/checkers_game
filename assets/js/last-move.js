@@ -1,5 +1,36 @@
 let completedTurnHistory = null;
 let currentTurnHistory = null;
+const captureCounts = { white: 0, black: 0 };
+
+function updateCaptureCounter(mover, capturedCount) {
+  if (capturedCount === 0) return;
+  if (mover !== "white" && mover !== "black") {
+    throw new RangeError(`Unsupported capture counter color: ${mover}`);
+  }
+
+  captureCounts[mover] += capturedCount;
+  const tray = document.getElementById(
+    mover === "white" ? "removedw" : "removedb"
+  );
+  let counter = tray.querySelector(".capture-counter");
+  if (!counter) {
+    counter = document.createElement("span");
+    counter.className = "capture-counter";
+    counter.setAttribute("role", "status");
+    counter.setAttribute("aria-live", "polite");
+    tray.appendChild(counter);
+  }
+  counter.classList.add(`capture-counter-${mover}`);
+
+  const count = captureCounts[mover];
+  counter.textContent = String(count);
+  counter.setAttribute(
+    "aria-label",
+    document.documentElement.lang === "fr"
+      ? `Pièces capturées : ${count}`
+      : `Pieces captured: ${count}`
+  );
+}
 
 function createCaptureGhost(squareId) {
   const square = document.getElementById(squareId);
@@ -64,6 +95,7 @@ document.addEventListener("checkers:move", (event) => {
   }
 
   const pendingCaptureSet = new Set(pendingCaptures);
+  updateCaptureCounter(mover, captures.length);
   currentTurnHistory.moves.push({ from, to });
   captures.forEach((squareId) => {
     const ghost = createCaptureGhost(squareId);
