@@ -41,7 +41,7 @@ const translations = {
     forcedHighlight: "Forced capture highlight",
     language: "Language",
     ruleset: "Rule set",
-    flyingKings: "Flying kings",
+    internationalDraughts: "International draughts",
     britishDraughts: "British draughts",
     difficulty: "Difficulty",
     easy: "Easy",
@@ -54,8 +54,8 @@ const translations = {
     jumpText:
       "Jump over an opponent's piece to an empty square beyond it. Captures are mandatory. If another capture is available after a jump, it must also be made.",
     king: "King:",
-    flyingKingText:
-      "A piece that reaches the last row becomes a king. Kings can move any number of empty squares diagonally and capture an opponent from a distance, landing on any empty square beyond it.",
+    internationalKingText:
+      "A piece that reaches the last row becomes a king. Kings move and capture any distance diagonally. In International draughts, captures must take the longest available sequence.",
     britishKingText:
       "A piece that reaches the last row becomes a king. Kings move one square diagonally forward or backward and capture by jumping an adjacent piece.",
     endOfGame: "End of game:",
@@ -102,7 +102,7 @@ const translations = {
     forcedHighlight: "Indiquer les prises obligatoires",
     language: "Langue",
     ruleset: "Variante",
-    flyingKings: "Dames volantes",
+    internationalDraughts: "Dames internationales",
     britishDraughts: "Dames anglaises",
     difficulty: "Difficulté",
     easy: "Facile",
@@ -115,8 +115,8 @@ const translations = {
     jumpText:
       "Sautez par-dessus un pion adverse jusqu'à une case vide située après lui. Les prises sont obligatoires. Si une autre prise est possible après un saut, elle doit également être effectuée.",
     king: "Dame :",
-    flyingKingText:
-      "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Elle peut se déplacer en diagonale sur plusieurs cases libres et prendre un pion adverse à distance en atterrissant sur une case libre après celui-ci.",
+    internationalKingText:
+      "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Les dames se déplacent et prennent en diagonale sur plusieurs cases libres. Aux dames internationales, une prise doit suivre la séquence la plus longue disponible.",
     britishKingText:
       "Lorsqu'un pion atteint la dernière rangée, il devient une dame. Elle se déplace d'une case en diagonale vers l'avant ou l'arrière et prend en sautant par-dessus un pion adjacent.",
     endOfGame: "Fin de partie :",
@@ -169,12 +169,12 @@ class Board {
         : getPreferredLanguage();
     const savedRuleset = storage.get("ruleset");
     this.ruleset =
-      savedRuleset === "british" || savedRuleset === "flying"
+      savedRuleset === "british" || savedRuleset === "international"
         ? savedRuleset
-        : "flying";
+        : "international";
     this.rulesEngine = new RulesEngine(this.ruleset);
     this.gameState = new GameState({
-      squares: Array(64).fill(null),
+      squares: Array(getSquareCount(this.ruleset)).fill(null),
       turn: "white",
       ruleset: this.ruleset,
       revision: 0
@@ -188,7 +188,7 @@ class Board {
         : "easy";
     this.applyLanguage();
     this.game = document.getElementById("game");
-    this.pieceElements = Array(64).fill(null);
+    this.pieceElements = Array(getSquareCount(this.ruleset)).fill(null);
     this.piecePositions = new WeakMap();
     this.playerColor = "piece-white";
     this.computerColor = "piece-black";
@@ -198,7 +198,7 @@ class Board {
     this.needTake = []; // save pieces that need to take
     // takeIt info to take a piece: actualPieceId, enemySquareId, opositeSquareId
     this.takeIt = [];
-    this.pieceTaking = null; //keeps the piece that is taking
+    this.pieceTaking = null;
     this.moveSound = new Audio("assets/audio/move.mp3");
     this.takeSound = new Audio("assets/audio/capture.mp3");
     this.menu = new Audio("assets/audio/menu.mp3");
@@ -235,15 +235,24 @@ class Board {
     }
 
     // create squares
+    this.buildBoard();
+  }
+
+  buildBoard() {
+    const boardSize = getBoardSize(this.ruleset);
+    this.game.querySelectorAll(".square").forEach((square) => square.remove());
+    this.game.style.gridTemplateColumns = `repeat(${boardSize}, auto)`;
+    const squareSize = boardSize === 10 ? "8vmin" : "10vmin";
     let color = "white";
-    for (let i = 0; i < 64; i++) {
+    for (let i = 0; i < boardSize * boardSize; i++) {
       color = color == "black" ? "white" : "black";
-      if (i % 8 == 0) {
+      if (i % boardSize == 0) {
         color = color == "black" ? "white" : "black"; // invert the color to the next row
       }
       const newDiv = document.createElement("div");
       newDiv.className = "square";
       newDiv.classList.add(color);
+      newDiv.style.width = `max(24px, ${squareSize})`;
       newDiv.id = i;
       newDiv.setAttribute("occupied", "false");
       this.game.appendChild(newDiv);
@@ -303,6 +312,21 @@ class Board {
       keepTurn =
         this.rulesEngine.getCaptureOptions(provisional, to).length > 0;
     }
+
+    const capturedSquaresToRemove =
+      RULESETS[this.gameState.ruleset].deferCapturedPieces && keepTurn
+        ? []
+        : [...new Set([...(state.pendingCaptures || []), ...validation.captures])];
+    const capturedColors = capturedSquaresToRemove.map(
+      (square) => state.squares[square].color
+    );
+    const capturedElements = capturedSquaresToRemove.map((square) => {
+      const piece = this.pieceElements[square];
+      if (!piece || this.piecePositions.get(piece) !== square) {
+        throw new Error(`No rendered piece matches captured square ${square}`);
+      }
+      return piece;
+    });
 
     const snapshot = this.gameState.applyMove({
       from,
@@ -433,14 +457,16 @@ class Board {
   }
 
   setRuleset(ruleset) {
-    if (ruleset !== "flying" && ruleset !== "british") {
+    if (ruleset !== "international" && ruleset !== "british") {
       throw new RangeError(`Unsupported ruleset: ${ruleset}`);
     }
     this.ruleset = ruleset;
     this.rulesEngine = new RulesEngine(ruleset);
     this.gameState = new GameState({
-      ...this.gameState.toJSON(),
-      ruleset
+      squares: Array(getSquareCount(ruleset)).fill(null),
+      turn: "white",
+      ruleset,
+      revision: 0
     });
     storage.set("ruleset", ruleset);
 
@@ -508,7 +534,7 @@ class Board {
         item.addEventListener("click", this.pieceClick);
       });
       setTimeout(() => {
-        this.checkWinner();
+        if (!this.pieceTaking) this.checkWinner();
       }, 1000);
 
       const playerColor = this.playerColor.slice("piece-".length);
@@ -534,7 +560,7 @@ class Board {
         item.movable = false;
       });
       setTimeout(() => {
-        this.checkWinner();
+        if (!this.pieceTaking) this.checkWinner();
       }, 1000);
       const computerColor = this.computerColor.slice("piece-".length);
       const computerPieces = this.getPieces(computerColor);
@@ -552,15 +578,27 @@ class Board {
       }
       setTimeout(() => board.computerMove(), timeMove);
     }
-    board.pieceTaking = null;
   }
 
   // Method to create pieces
   createPieces() {
     /* Create the pieces on the board*/
-    const blackPieces = [1, 3, 5, 7, 8, 10, 12, 14, 17, 19, 21, 23];
-    const whitePieces = [40, 42, 44, 46, 49, 51, 53, 55, 56, 58, 60, 62];
-    const squares = Array(64).fill(null);
+    const boardSize = getBoardSize(this.ruleset);
+    const squareCount = boardSize * boardSize;
+    const blackPieces = [];
+    const whitePieces = [];
+    const pieceRows = this.ruleset === "international" ? 4 : 3;
+    for (let row = 0; row < pieceRows; row++) {
+      for (let column = 0; column < boardSize; column++) {
+        if ((row + column) % 2 === 1) blackPieces.push(row * boardSize + column);
+      }
+    }
+    for (let row = boardSize - pieceRows; row < boardSize; row++) {
+      for (let column = 0; column < boardSize; column++) {
+        if ((row + column) % 2 === 1) whitePieces.push(row * boardSize + column);
+      }
+    }
+    const squares = Array(squareCount).fill(null);
     blackPieces.forEach((square) => {
       squares[square] = { color: "black", king: false };
     });
@@ -573,7 +611,7 @@ class Board {
       ruleset: this.ruleset,
       revision: 0
     });
-    this.pieceElements = Array(64).fill(null);
+    this.pieceElements = Array(squareCount).fill(null);
 
     this.gameState.squares.forEach((pieceState, square) => {
       const squareElement = document.getElementById(square);
@@ -665,7 +703,6 @@ class Board {
       dragSquares.forEach((item) => {
         item.classList.remove("possible");
       });
-      board.pieceTaking = null;
       board.gameControl();
     }
   }
@@ -681,15 +718,13 @@ class Board {
       this.computerColor.slice("piece-".length)
     );
     let piecesToCheck = this.pieceTaking ? [this.pieceTaking] : computerPieces;
-    let captureOptions = this.getComputerCaptures(piecesToCheck);
-    let captureCount = 0;
+    const captureOptions = this.getComputerCaptures(piecesToCheck);
 
     if (captureOptions.length > 0) {
-      while (captureOptions.length > 0 && captureCount < 12) {
-        this.takeIt = captureOptions;
-        board.takePiece();
-        captureCount++;
-        captureOptions = this.getComputerCaptures([this.pieceTaking]);
+      this.takeIt = captureOptions;
+      if (this.takePiece()) {
+        setTimeout(() => this.computerMove(), 500);
+        return;
       }
     } else {
       board.moveComputerPiece();
@@ -715,13 +750,14 @@ class Board {
     }
     const wasKing = pieceState.king;
     const destinationId = Number(destination.id);
-    const captures = capturedSquare ? [Number(capturedSquare.id)] : [];
+    const captures =
+      capturedSquare != null ? [Number(capturedSquare.id)] : [];
     const simulation = GameState.fromJSON(this.gameState.toJSON());
     simulation.applyMove({
       from,
       to: destinationId,
       captures,
-      keepTurn: true,
+      keepTurn: false,
       revision: simulation.revision
     });
 
@@ -743,9 +779,11 @@ class Board {
       });
 
     const mobility = this.rulesEngine.getLegalMoves(simulation, destinationId).length;
-    const row = Math.floor(destinationId / 8);
-    const column = Number(destination.id) % 8;
-    const centerDistance = Math.abs(column - 3.5) + Math.abs(row - 3.5);
+    const boardSize = getBoardSize(this.ruleset);
+    const row = Math.floor(destinationId / boardSize);
+    const column = Number(destination.id) % boardSize;
+    const center = (boardSize - 1) / 2;
+    const centerDistance = Math.abs(column - center) + Math.abs(row - center);
     const advancement = movedPiece.color === "white" ? -row : row;
     const score =
       advancement * 2 +
@@ -864,7 +902,10 @@ class Board {
     Output (boolean): true if piece can take */
 
     this.needTake = [];
-    pieces.forEach((item) => {
+    const piecesToCheck = this.pieceTaking
+      ? pieces.filter((item) => item === this.pieceTaking)
+      : pieces;
+    piecesToCheck.forEach((item) => {
       this.checkpossibleMove(item);
     });
     if (this.needTake.length > 0) {
@@ -1331,9 +1372,9 @@ class Menu {
           "ruleset"
         )}</label>
         <select id="ruleset-select">
-          <option value="flying" ${
-            board.ruleset === "flying" ? "selected" : ""
-          }>${board.translate("flyingKings")}</option>
+          <option value="international" ${
+            board.ruleset === "international" ? "selected" : ""
+          }>${board.translate("internationalDraughts")}</option>
           <option value="british" ${
             board.ruleset === "british" ? "selected" : ""
           }>${board.translate("britishDraughts")}</option>
@@ -1465,7 +1506,7 @@ class Menu {
     <p>${board.translate("jumpText")}</p>
     <p class="text-g">${board.translate("king")}</p>
     <p>${board.translate(
-      board.ruleset === "flying" ? "flyingKingText" : "britishKingText"
+      board.ruleset === "international" ? "internationalKingText" : "britishKingText"
     )}</p>
     <p class="text-g">${board.translate("endOfGame")}</p>
     <p>${board.translate("endOfGameText")}</p>

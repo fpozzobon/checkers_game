@@ -36,4 +36,11 @@ document.addEventListener("checkers:move", (event) => {
     ghost.setAttribute("tabindex", "-1");
     capturedSquare.appendChild(ghost);
   });
+
+  renderMoveHistory();
+  if (turnCompleted) {
+    completedTurnHistory = currentTurnHistory;
+    currentTurnHistory = null;
+    renderMoveHistory();
+  }
 });
