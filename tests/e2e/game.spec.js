@@ -151,6 +151,48 @@ test("hard computer only considers globally legal longest captures", async ({ pa
   expect(captureSources).toEqual([11]);
 });
 
+test("forced-capture highlight only includes globally longest International captures", async ({ page }) => {
+  await page.goto("/");
+
+  const highlightedSources = await page.evaluate(async () => {
+    const { RulesEngine } = await import("/assets/js/core/rules-engine.js");
+    const board = window.checkersBoard;
+    const squares = Array(100).fill(null);
+    squares[11] = { color: "white", king: false };
+    squares[22] = { color: "black", king: false };
+    squares[44] = { color: "black", king: false };
+    squares[71] = { color: "white", king: false };
+    squares[82] = { color: "black", king: false };
+    const pieces = [11, 71].map((square) => {
+      const piece = document.createElement("div");
+      piece.className = "piece piece-white";
+      board.piecePositions.set(piece, square);
+      return piece;
+    });
+
+    board.ruleset = "international";
+    board.rulesEngine = new RulesEngine("international");
+    board.gameState = {
+      squares,
+      turn: "white",
+      ruleset: "international",
+      revision: 0,
+      pendingCaptures: [],
+      continuationSquare: null
+    };
+    board.playerColor = "piece-white";
+    board.pieceTaking = null;
+    board.optionHighlight = true;
+
+    board.checkIfcanTake(pieces);
+    return pieces
+      .filter((piece) => piece.classList.contains("highlight"))
+      .map((piece) => board.piecePositions.get(piece));
+  });
+
+  expect(highlightedSources).toEqual([11]);
+});
+
 test("runs a full computer-vs-computer party", async ({ page }) => {
   await page.goto("/");
   await page.locator("#vs-computer").click();

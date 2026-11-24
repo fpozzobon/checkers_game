@@ -1,6 +1,6 @@
 //Board class that create and command the game
 /*jshint esversion: 11 */
-const APP_VERSION = window.APP_VERSION || "0.27";
+const APP_VERSION = window.APP_VERSION || "0.28";
 const coreVersion = `v=${encodeURIComponent(APP_VERSION)}`;
 const { GameState } = await import(`./core/game-state.js?${coreVersion}`);
 const {
@@ -922,8 +922,21 @@ class Board {
     const piecesToCheck = this.pieceTaking
       ? pieces.filter((item) => item === this.pieceTaking)
       : pieces;
-    piecesToCheck.forEach((item) => {
-      this.checkpossibleMove(item);
+    const piecesBySquare = new Map(
+      piecesToCheck.map((item) => [this.piecePositions.get(item), item])
+    );
+    const mandatoryCaptures = this.rulesEngine.getMandatoryCaptures(
+      this.gameState,
+      this.gameState.turn
+    );
+    this.takeIt = [];
+    mandatoryCaptures.forEach((options, from) => {
+      const item = piecesBySquare.get(from);
+      if (!item) return;
+      this.needTake.push(item);
+      options.forEach((option) => {
+        this.takeIt.push([item, option.captures[0], option.to]);
+      });
     });
     if (this.needTake.length > 0) {
       this.needTake.forEach((item) => {
