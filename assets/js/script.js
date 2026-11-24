@@ -1594,13 +1594,7 @@ const chat = new FrenchChat({
   personaLabel: document.getElementById("chat-persona"),
   form: document.getElementById("chat-form"),
   input: document.getElementById("chat-input"),
-  sendButton: document.getElementById("chat-send"),
-  getContext: () => ({
-    playerCaptures: chat.playerCaptures,
-    computerCaptures: chat.computerCaptures,
-    moves: board.gameState.revision,
-    result: chat.result
-  })
+  sendButton: document.getElementById("chat-send")
 });
 const menu = new Menu();
 menu.createMenu();

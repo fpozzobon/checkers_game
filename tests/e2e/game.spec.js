@@ -176,7 +176,7 @@ test("French chat is shown below the board on desktop and toggles on compact scr
 
   await expect(page.locator("#chat-toggle")).toBeVisible();
   await expect(page.locator("#computer-chat")).toBeVisible();
-  await expect(page.locator("#chat-persona")).toContainText(/·/);
+  await expect(page.locator("#chat-persona")).toHaveText("Lucas");
 
   const [boardBounds, squareBounds, chatTop] = await Promise.all([
     page.locator("#game").evaluate(board => {
@@ -202,8 +202,9 @@ test("French chat is shown below the board on desktop and toggles on compact scr
   const sentAt = Date.now();
   await page.locator("#chat-send").click();
   const reply = page.locator(".chat-message-computer").last();
-  await expect(reply).toContainText(/Merci !/);
-  expect(Date.now() - sentAt).toBeGreaterThanOrEqual(650);
+  await expect(reply).toContainText(/merci|chance/i);
+  await expect(page.locator(".chat-thinking")).toHaveCount(0);
+  expect(Date.now() - sentAt).toBeGreaterThanOrEqual(1200);
 
   await page.setViewportSize({ width: 390, height: 700 });
   await expect(page.locator("#computer-chat")).toBeHidden();

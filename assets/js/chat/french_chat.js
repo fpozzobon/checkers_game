@@ -1,98 +1,15 @@
-export const FRENCH_PERSONAS = Object.freeze([
-  Object.freeze({ name: "Camille", nationality: "Belgique" }),
-  Object.freeze({ name: "Alex", nationality: "Canada" }),
-  Object.freeze({ name: "Aïssatou", nationality: "Sénégal" }),
-  Object.freeze({ name: "Léa", nationality: "Suisse" }),
-  Object.freeze({ name: "Noé", nationality: "France" })
-]);
+import SmartFrenchCheckersBot from "./french_checkers_chat.js";
 
-export const FRENCH_CONVERSATION_TREE = Object.freeze([
-  Object.freeze({
-    intent: "greeting",
-    keywords: ["bonjour", "salut", "coucou", "hello", "bonsoir"],
-    replies: ["Salut ! Prêt à jouer ? Je garde un œil sur les prises.", "Bonjour ! La partie commence, à toi de jouer."]
-  }),
-  Object.freeze({
-    intent: "praise",
-    keywords: ["bien joue", "bravo", "super", "joli coup", "merci"],
-    replies: [
-      context => context.result === "win"
-        ? "Merci ! Tu as très bien joué et tu as remporté la partie."
-        : context.playerCaptures > context.computerCaptures
-          ? "Merci ! Tes prises te donnent l'avantage, continue comme ça."
-          : context.computerCaptures > context.playerCaptures
-            ? "Merci ! La partie reste ouverte, le prochain coup peut tout changer."
-            : "Merci ! Tu joues avec attention, chaque coup compte."
-    ]
-  }),
-  Object.freeze({
-    intent: "capture",
-    keywords: ["prise", "prendre", "capture", "mange"],
-    replies: [
-      context => context.playerCaptures > 0
-        ? `Tu as déjà réalisé ${context.playerCaptures} prise${context.playerCaptures > 1 ? "s" : ""}. Pense à vérifier les prises obligatoires.`
-        : "Les prises sont obligatoires quand elles sont possibles. Cherche bien les diagonales !"
-    ]
-  }),
-  Object.freeze({
-    intent: "strategy",
-    keywords: ["conseil", "strategie", "astuce", "aide", "que faire"],
-    replies: [
-      context => context.moves > 12
-        ? "Protège tes pions isolés et prépare une prise sans offrir la suivante."
-        : "Essaie de garder tes pions groupés et surveille les prises obligatoires."
-    ]
-  }),
-  Object.freeze({
-    intent: "rules",
-    keywords: ["regle", "dame", "roi", "comment jouer"],
-    replies: ["Un pion qui atteint la dernière rangée devient une dame. Les prises sont obligatoires."]
-  }),
-  Object.freeze({
-    intent: "encouragement",
-    keywords: ["dur", "difficile", "perdu", "dommage", "triste"],
-    replies: [
-      context => context.result === "loss"
-        ? "La partie est terminée, mais tu peux repartir sur une nouvelle stratégie. Bien joué d'être allé jusqu'au bout !"
-        : "Rien n'est joué ! Prends ton temps et cherche les coups qui protègent tes pions."
-    ]
-  }),
-  Object.freeze({
-    intent: "farewell",
-    keywords: ["au revoir", "a bientot", "a plus", "bye"],
-    replies: ["À bientôt pour une nouvelle partie !"]
-  }),
-  Object.freeze({
-    intent: "default",
-    keywords: [],
-    replies: [
-      context => context.computerCaptures > context.playerCaptures
-        ? "La partie est serrée. Tu veux parler stratégie, prises ou règles ?"
-        : "Je t'écoute ! On peut parler de stratégie, de prises ou des règles."
-    ]
-  })
-]);
-
-const normalize = value =>
-  value
-    .toLocaleLowerCase("fr")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-export function chooseFrenchPersona(random = Math.random) {
-  return FRENCH_PERSONAS[Math.floor(random() * FRENCH_PERSONAS.length)];
-}
-
-export function getFrenchReply(message, context = {}, random = Math.random) {
-  const normalizedMessage = normalize(message);
-  const node = FRENCH_CONVERSATION_TREE.find(
-    candidate =>
-      candidate.intent === "default" ||
-      candidate.keywords.some(keyword => normalizedMessage.includes(keyword))
-  );
-  const replies = node.replies;
-  const reply = replies[Math.floor(random() * replies.length)];
-  return typeof reply === "function" ? reply(context) : reply;
+export function createSmartFrenchCheckersConversation(options) {
+  const bot = new SmartFrenchCheckersBot(options);
+  return {
+    name: bot.name,
+    start: () => bot.triggerEvent("start", true),
+    sendMessage: message => bot.receivePlayerMessage(message),
+    updateBoardState: (botScore, playerScore) =>
+      bot.updateBoardState(botScore, playerScore),
+    triggerEvent: (eventName, force) => bot.triggerEvent(eventName, force)
+  };
 }
 
 export class FrenchChat {
@@ -104,8 +21,12 @@ export class FrenchChat {
     form,
     input,
     sendButton,
-    getContext
+    conversationFactory = createSmartFrenchCheckersConversation
   }) {
+    if (typeof conversationFactory !== "function") {
+      throw new TypeError("conversationFactory must be a function");
+    }
+
     this.toggleButton = toggleButton;
     this.panel = panel;
     this.log = log;
@@ -113,13 +34,13 @@ export class FrenchChat {
     this.form = form;
     this.input = input;
     this.sendButton = sendButton;
-    this.getContext = getContext;
-    this.persona = null;
+    this.conversationFactory = conversationFactory;
     this.playerCaptures = 0;
     this.computerCaptures = 0;
-    this.result = null;
     this.active = false;
     this.pending = false;
+    this.conversationGeneration = 0;
+    this.thinkingMessage = null;
     this.compactScreen = window.matchMedia(
       "(max-width: 900px), (max-height: 720px)"
     );
@@ -131,10 +52,12 @@ export class FrenchChat {
     });
     document.addEventListener("checkers:move", event => this.recordMove(event.detail));
     document.addEventListener("checkers:gameover", event => {
-      this.result =
-        event.detail.winner === window.checkersBoard.playerColor.slice(6)
-          ? "win"
-          : "loss";
+      const playerColor = window.checkersBoard.playerColor.slice(6);
+      const eventName =
+        event.detail.winner === playerColor ? "botLose" : "botWin";
+      if (this.conversation && typeof this.conversation.triggerEvent === "function") {
+        this.conversation.triggerEvent(eventName, true);
+      }
     });
     this.compactScreen.addEventListener("change", () => {
       if (this.active) this.setOpen(!this.compactScreen.matches);
@@ -144,17 +67,38 @@ export class FrenchChat {
   start() {
     this.active = true;
     document.getElementById("center").classList.add("chat-active");
-    this.pending = false;
+    this.conversationGeneration++;
+    const generation = this.conversationGeneration;
+    if (this.conversation && typeof this.conversation.stop === "function") {
+      this.conversation.stop();
+    }
+
+    this.pending = true;
     this.playerCaptures = 0;
     this.computerCaptures = 0;
-    this.result = null;
-    this.persona = chooseFrenchPersona();
-    this.personaLabel.textContent = `${this.persona.name} · ${this.persona.nationality}`;
     this.log.replaceChildren();
     this.toggleButton.hidden = false;
     this.setOpen(!this.compactScreen.matches);
-    this.input.disabled = true;
-    this.scheduleReply(`Salut ! Je m'appelle ${this.persona.name}. Bonne partie, et que le meilleur gagne !`);
+    this.setInputEnabled(false);
+    this.thinkingMessage = null;
+    this.conversation = this.conversationFactory({
+      name: "Lucas",
+      onTypingChange: typing => this.handleTypingChange(typing, generation),
+      onMessage: message => this.handleMessage(message, generation)
+    });
+
+    if (
+      !this.conversation ||
+      typeof this.conversation.start !== "function" ||
+      typeof this.conversation.sendMessage !== "function"
+    ) {
+      throw new TypeError(
+        "A conversation must implement start() and sendMessage(message)"
+      );
+    }
+
+    this.personaLabel.textContent = this.conversation.name || "Adversaire";
+    this.conversation.start();
   }
 
   toggle() {
@@ -180,6 +124,16 @@ export class FrenchChat {
     } else {
       this.computerCaptures += move.captures.length;
     }
+
+    if (
+      this.conversation &&
+      typeof this.conversation.updateBoardState === "function"
+    ) {
+      this.conversation.updateBoardState(
+        this.computerCaptures,
+        this.playerCaptures
+      );
+    }
   }
 
   send() {
@@ -187,30 +141,48 @@ export class FrenchChat {
     if (!message || this.pending) return;
     this.appendMessage(message, "player");
     this.input.value = "";
-    this.input.disabled = true;
-    this.sendButton.disabled = true;
-    this.scheduleReply(getFrenchReply(message, this.getContext()));
+    this.pending = true;
+    this.setInputEnabled(false);
+    this.conversation.sendMessage(message);
   }
 
-  scheduleReply(reply) {
-    this.pending = true;
-    this.input.disabled = true;
-    this.sendButton.disabled = true;
-    const thinking = this.appendMessage("Je réfléchis…", "thinking");
-    const delay = 700 + Math.floor(Math.random() * 1101);
-    window.setTimeout(() => {
-      thinking.remove();
-      this.appendMessage(reply, "computer");
-      this.pending = false;
-      this.input.disabled = false;
-      this.sendButton.disabled = false;
-      if (!this.panel.hidden) this.input.focus();
-    }, delay);
+  handleTypingChange(typing, generation) {
+    if (!this.active || generation !== this.conversationGeneration) return;
+    if (typing) {
+      if (!this.thinkingMessage) {
+        this.thinkingMessage = this.appendMessage("Je réfléchis…", "thinking");
+      }
+    } else if (this.thinkingMessage) {
+      this.thinkingMessage.remove();
+      this.thinkingMessage = null;
+    }
+  }
+
+  handleMessage(message, generation) {
+    if (!this.active || generation !== this.conversationGeneration) return;
+    if (this.thinkingMessage) {
+      this.thinkingMessage.remove();
+      this.thinkingMessage = null;
+    }
+    const text = typeof message === "string" ? message : message.text;
+    if (typeof text !== "string") {
+      throw new TypeError("Conversation messages must contain text");
+    }
+    this.appendMessage(text, "computer");
+    this.pending = false;
+    this.setInputEnabled(true);
+    if (!this.panel.hidden) this.input.focus();
+  }
+
+  setInputEnabled(enabled) {
+    this.input.disabled = !enabled;
+    this.sendButton.disabled = !enabled;
   }
 
   appendMessage(message, author) {
     const element = document.createElement("div");
     element.className = `chat-message chat-message-${author}`;
+    if (author === "thinking") element.classList.add("chat-thinking");
     element.textContent = message;
     this.log.appendChild(element);
     this.log.scrollTop = this.log.scrollHeight;

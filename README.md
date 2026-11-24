@@ -66,7 +66,8 @@ assets/js/
 ├── script.js            # UI layer: Board, Piece and Menu classes, computer AI, i18n strings
 ├── last-move.js         # Classic script: renders last-move highlight and captured "ghosts"
 ├── chat/
-│   └── french_chat.js   # French conversation tree, randomized persona, and delayed chat UI
+│   ├── french_chat.js   # Pluggable conversation UI and SmartFrenchCheckersBot adapter
+│   └── french_checkers_chat.js # SmartFrenchCheckersBot conversational engine
 └── core/
     ├── rulesets.js      # RULESETS config (board size and rule flags), getBoardSize, getSquareCount
     ├── game-state.js    # GameState: serializable, DOM-free position
@@ -77,7 +78,7 @@ assets/js/
 - **`GameState`** holds plain board data (64 squares for British or 100 for International, `turn`, `ruleset`, a `revision` counter, `pendingCaptures` and `continuationSquare`), so it can later be sent over a network. `pendingCaptures` lists pieces already jumped in a multi-capture that are still on the board as blockers (International only). `continuationSquare` is the square of the piece that must keep capturing. `applyMove` checks state integrity and turn ownership, handles king promotion, removes captured pieces (immediately in British, at the end of the sequence in International), and rejects stale revisions.
 - **`RulesEngine`** is stateless apart from the chosen ruleset. It decides what is legal. Public queries: `getCaptureOptions`, `getSimpleMoves`, `getMandatoryCaptures`, `getLegalMoves`, `validateMove`, `hasLegalMoves`. Internally it enumerates full capture paths (`getCapturePaths`) and derives the first-jump options from them (`getFirstCaptureOptions`), applying the longest-sequence filter when the ruleset requires it.
 - **`script.js`** keeps the rendered DOM in sync with `GameState`. Every move goes through `Board.submitMove`, which validates, applies the move to the state, updates the DOM and dispatches a `checkers:move` event that `last-move.js` listens to.
-- **`chat/french_chat.js`** contains the French chat's keyword conversation tree and randomly chosen Francophone persona. The chat is placed below the board on larger screens, and can be opened from the fullscreen control area on compact screens.
+- **`chat/french_chat.js`** owns the chat UI and accepts a `conversationFactory`, so another conversation class can be plugged in without changing the UI. Its default factory adapts **`chat/french_checkers_chat.js`** (`SmartFrenchCheckersBot`) to the chat's `start()`/`sendMessage()` contract. The chat is placed below the board on larger screens, and can be opened from the fullscreen control area on compact screens.
 - **Square numbering**: squares are indexed row-major from the top-left: 0-63 for British, 0-99 for International. Black starts at the top (three rows in British, four in International), White at the bottom. White always moves first.
 
 ## Features
@@ -142,7 +143,7 @@ Shows the number of games won by the player and by the computer, with a button t
 - Captured pieces are collected in trays beside the board.
 - A game-over dialog announces the winner (no pieces left, or no legal moves) and returns to the menu (by reloading the page).
 - The computer plays with a random "thinking" delay that is shorter on higher difficulties (roughly 1.8-3.8 s on Easy, 1.2-2.5 s on Medium, 0.55-1.25 s on Hard), plus 0.5 s between the jumps of a multi-capture.
-- A French chat has keyword-based replies, contextual encouragement, and a randomly selected persona. Replies have a randomized pause; on compact screens the conversation stays hidden until its button is pressed.
+- A French chat uses `SmartFrenchCheckersBot` for conversational replies and adapts its typing indicator to the chat UI. The UI accepts a custom `conversationFactory` for future engines; on compact screens the conversation stays hidden until its button is pressed.
 
 | Difficulty | Quiet moves | Captures |
 | --- | --- | --- |
