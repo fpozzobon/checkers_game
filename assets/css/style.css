@@ -232,7 +232,8 @@ body {
     height: max(24px, var(--large-square-size));
   }
 
-  #game .piece {
+  #game .piece,
+  #game .last-captured-ghost {
     width: max(17px, var(--large-piece-size));
     height: max(17px, var(--large-piece-size));
   }

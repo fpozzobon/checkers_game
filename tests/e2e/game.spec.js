@@ -82,6 +82,38 @@ test("ruleset selection, Rules screen, and capture history preserve the board", 
   await expect(page.locator("#game > .square .piece")).toHaveCount(40);
 });
 
+test("captured-piece marker matches board piece size on desktop", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  await page.locator("#vs-computer").click();
+  await page.locator("#start-computer").click();
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new CustomEvent("checkers:move", {
+      detail: {
+        from: 44,
+        to: 55,
+        captures: [1],
+        pendingCaptures: [],
+        mover: "white",
+        turnCompleted: true
+      }
+    }));
+  });
+
+  const [capturedPieceBounds, boardPieceBounds] = await Promise.all([
+    page.locator(".last-captured-ghost").evaluate((piece) => {
+      const { width, height } = piece.getBoundingClientRect();
+      return { width, height };
+    }),
+    page.locator("#game .piece").first().evaluate((piece) => {
+      const { width, height } = piece.getBoundingClientRect();
+      return { width, height };
+    })
+  ]);
+  expect(capturedPieceBounds).toEqual(boardPieceBounds);
+});
+
 test("hard computer only considers globally legal longest captures", async ({ page }) => {
   await page.goto("/");
 

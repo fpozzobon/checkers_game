@@ -1,6 +1,6 @@
 //Board class that create and command the game
 /*jshint esversion: 11 */
-const APP_VERSION = window.APP_VERSION || "0.26";
+const APP_VERSION = window.APP_VERSION || "0.27";
 const coreVersion = `v=${encodeURIComponent(APP_VERSION)}`;
 const { GameState } = await import(`./core/game-state.js?${coreVersion}`);
 const {
