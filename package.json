@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/core/game-state.test.js tests/core/rules-engine.test.js",
+    "test": "node --test tests/core/game-state.test.js tests/core/rules-engine.test.js tests/core/french-chat.test.js",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
